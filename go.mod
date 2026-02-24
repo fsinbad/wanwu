@@ -8,7 +8,7 @@ require (
 	github.com/IBM/sarama v1.43.2
 	github.com/ThinkInAIXYZ/go-mcp v0.2.22
 	github.com/bwmarrin/snowflake v0.3.0
-	github.com/cloudwego/eino v0.7.32
+	github.com/cloudwego/eino v0.7.34
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.4
 	github.com/cloudwego/eino-ext/components/tool/mcp v0.0.6
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
