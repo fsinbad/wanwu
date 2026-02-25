@@ -324,11 +324,11 @@
             :render-header="renderHeader"
           >
             <template slot-scope="scope">
-              <uploadFileMD
+              <uploadImgMd
                 v-model="scope.row.content"
                 :permission-type="permissionType"
                 :knowledgeId="obj.knowledgeId"
-              ></uploadFileMD>
+              ></uploadImgMd>
               <div
                 v-if="
                   cardObj[0]['isParent'] &&
@@ -431,7 +431,7 @@
                         v-html="Md2Img(segment.content)"
                       ></div>
                       <div v-else class="content-edit">
-                        <uploadFileMD
+                        <uploadImgMd
                           v-model="segment.content"
                           :permission-type="permissionType"
                           :knowledgeId="obj.knowledgeId"
@@ -441,7 +441,7 @@
                                 `${scope.row.contentId}-${index}`
                               ] = newContent)
                           "
-                        ></uploadFileMD>
+                        ></uploadImgMd>
                       </div>
                     </div>
                   </el-collapse-item>
@@ -531,7 +531,7 @@ import {
   POWER_TYPE_SYSTEM_ADMIN,
 } from '@/views/knowledge/constants';
 import SearchInput from '@/components/searchInput.vue';
-import uploadFileMD from '@/components/uploadImgMd.vue';
+import uploadImgMd from '@/components/uploadImgMd.vue';
 
 export default {
   components: {
@@ -539,7 +539,7 @@ export default {
     dataBaseDialog,
     tagDialog,
     createChunk,
-    uploadFileMD,
+    uploadImgMd,
   },
   data() {
     return {

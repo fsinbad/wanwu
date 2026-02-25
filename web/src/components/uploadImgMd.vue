@@ -14,7 +14,7 @@
       @focus="onFocus"
       @blur="onBlur"
       @input="onInput"
-      v-html="Md2Img(currentValue)"
+      v-html="localContent"
     ></div>
 
     <!-- 只在非只读模式下显示上传按钮 -->
@@ -34,7 +34,7 @@
 
 <script>
 import { Md2Img, Img2Md } from '@/utils/util';
-import { POWER_TYPE_READ } from '@/views/knowledge/constants';
+import { POWER_TYPE_EDIT, POWER_TYPE_READ } from '@/views/knowledge/constants';
 import { getDocLimit } from '@/api/knowledge';
 import { uploadFileMD } from '@/api/chunkFile';
 
@@ -46,7 +46,7 @@ export default {
     },
     permissionType: {
       type: Number,
-      default: POWER_TYPE_READ,
+      default: POWER_TYPE_EDIT,
     },
     knowledgeId: {
       type: String,
@@ -55,7 +55,10 @@ export default {
   },
   data() {
     return {
+      localValue: this.value, // value是MD格式
+      localContent: Md2Img(this.value), // content是HTML格式
       savedRange: null,
+      savedCharacterOffset: 0,
       isComposing: false, // 用于处理中文输入法等复杂输入场景
       acceptType: '.png,.jpg,.jpeg',
       maxSize: 3,
@@ -90,17 +93,13 @@ export default {
       },
     },
     currentValue(newVal) {
-      if (newVal !== this.localContent) {
-        this.localContent = newVal;
+      if (newVal !== this.localValue) {
+        this.localValue = newVal;
+        this.localContent = Md2Img(newVal);
       }
     },
   },
-  created() {
-    this.localContent = this.currentValue;
-  },
   methods: {
-    Md2Img,
-
     uploadOnChange(file) {
       if (file) {
         if (file.size / 1024 / 1024 > this.maxSize) {
@@ -151,16 +150,115 @@ export default {
       if (this.isComposing) return;
 
       const currentHTML = event.target.innerHTML;
-      this.localContent = currentHTML;
-      this.$emit('input', currentHTML);
+      this.localValue = Img2Md(currentHTML);
       // 保存光标位置，因为内容变化后光标位置可能改变
       this.saveCaretPosition();
+      this.$emit('input', this.localValue);
+    },
+
+    getCharacterOffsetFromRange(range) {
+      if (!range) return null;
+
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(this.$refs.editorRef);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+
+      // 获取选区内的HTML内容
+      const container = preSelectionRange.cloneContents();
+      let offset = 0;
+
+      // 递归遍历所有节点，包括嵌套的节点
+      function traverseNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          // 文本节点：直接计算文本长度
+          offset += node.textContent.length;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // 元素节点：+1（表示一个节点）
+          offset += 1;
+          // 递归处理子节点
+          for (let i = 0; i < node.childNodes.length; i++) {
+            traverseNodes(node.childNodes[i]);
+          }
+        }
+      }
+
+      // 遍历容器内的所有节点
+      for (let i = 0; i < container.childNodes.length; i++) {
+        traverseNodes(container.childNodes[i]);
+      }
+
+      return offset;
+    },
+
+    restoreCaretPositionByOffset(targetOffset) {
+      if (!targetOffset || targetOffset < 0) return;
+
+      const editor = this.$refs.editorRef;
+      if (!editor) return;
+
+      const range = document.createRange();
+      const selection = window.getSelection();
+      let currentOffset = 0;
+
+      // 递归遍历所有节点，包括嵌套的节点
+      function traverseNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const textLength = node.textContent.length;
+          if (currentOffset + textLength >= targetOffset) {
+            // 光标在当前文本节点内
+            const positionInText = targetOffset - currentOffset;
+            range.setStart(node, positionInText);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.savedRange = range.cloneRange();
+            return true;
+          }
+          currentOffset += textLength;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // 元素节点：+1（表示一个节点）
+          if (currentOffset + 1 >= targetOffset) {
+            // 光标在元素节点后面
+            range.setStartAfter(node);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.savedRange = range.cloneRange();
+            return true;
+          }
+          currentOffset += 1;
+          // 递归处理子节点
+          for (let i = 0; i < node.childNodes.length; i++) {
+            if (traverseNodes.call(this, node.childNodes[i])) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // 遍历编辑器的所有子节点
+      for (let i = 0; i < editor.childNodes.length; i++) {
+        if (traverseNodes.call(this, editor.childNodes[i])) {
+          return;
+        }
+      }
+
+      // 如果没找到精确位置，将光标移到末尾
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      this.savedRange = range.cloneRange();
     },
 
     saveCaretPosition() {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         this.savedRange = selection.getRangeAt(0).cloneRange();
+        this.savedCharacterOffset = this.getCharacterOffsetFromRange(
+          this.savedRange,
+        );
       }
     },
 
@@ -181,23 +279,25 @@ export default {
         newRange.setStartAfter(textNode);
         newRange.collapse(true);
 
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(newRange);
-
         this.savedRange = newRange.cloneRange();
 
         // 触发内容更新
-        this.$nextTick(() => {
-          const newHTML = this.$refs.editorRef.innerHTML;
-          this.localContent = Img2Md(newHTML);
-          this.$emit('input', this.localContent);
-        });
+        const newHTML = this.$refs.editorRef.innerHTML;
+        this.localContent = Md2Img(newHTML, false);
+        this.localValue = Img2Md(newHTML, false);
+        this.$emit('input', this.localValue);
+
+        if (this.savedCharacterOffset !== null) {
+          this.$nextTick(() => {
+            const newOffset = this.savedCharacterOffset + 1;
+            this.restoreCaretPositionByOffset(newOffset);
+          });
+        }
       } else {
         // 如果没有保存的光标位置，直接添加到末尾
-        const currentHTML = this.$refs.editorRef.innerHTML;
-        this.localContent = Img2Md(currentHTML + mdImageLink);
-        this.$emit('input', this.localContent);
+        this.localValue += mdImageLink;
+        this.localContent = Img2Md(this.localValue, false);
+        this.$emit('input', this.localValue);
       }
     },
   },
