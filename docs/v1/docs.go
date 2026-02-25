@@ -9582,6 +9582,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "format": "int32",
                         "description": "模型体验对话ID",
                         "name": "modelExperienceId",
                         "in": "query",
@@ -9758,6 +9759,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "启用状态（true: 启用）",
                         "name": "isActive",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型作用域类型",
+                        "name": "ScopeType",
                         "in": "query"
                     }
                 ],
@@ -20872,6 +20879,10 @@ const docTemplate = `{
                 "provider"
             ],
             "properties": {
+                "allowEdit": {
+                    "description": "是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）",
+                    "type": "boolean"
+                },
                 "avatar": {
                     "description": "模型图标路径",
                     "allOf": [
@@ -23294,6 +23305,10 @@ const docTemplate = `{
                 "provider"
             ],
             "properties": {
+                "allowEdit": {
+                    "description": "是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）",
+                    "type": "boolean"
+                },
                 "avatar": {
                     "description": "模型图标路径",
                     "allOf": [

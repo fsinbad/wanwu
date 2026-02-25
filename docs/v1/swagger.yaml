@@ -4603,6 +4603,9 @@ definitions:
     type: object
   response.CozeWorkflowModelInfo:
     properties:
+      allowEdit:
+        description: '是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）'
+        type: boolean
       avatar:
         allOf:
         - $ref: '#/definitions/request.Avatar'
@@ -6228,6 +6231,9 @@ definitions:
     type: object
   response.ModelInfo:
     properties:
+      allowEdit:
+        description: '是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）'
+        type: boolean
       avatar:
         allOf:
         - $ref: '#/definitions/request.Avatar'
@@ -12783,6 +12789,7 @@ paths:
       description: 获取模型体验对话记录列表
       parameters:
       - description: 模型体验对话ID
+        format: int32
         in: query
         name: modelExperienceId
         required: true
@@ -12884,6 +12891,10 @@ paths:
       - description: '启用状态（true: 启用）'
         in: query
         name: isActive
+        type: string
+      - description: 模型作用域类型
+        in: query
+        name: ScopeType
         type: string
       produces:
       - application/json

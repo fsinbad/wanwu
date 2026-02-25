@@ -3776,6 +3776,10 @@ const docTemplate = `{
                 "provider"
             ],
             "properties": {
+                "allowEdit": {
+                    "description": "是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）",
+                    "type": "boolean"
+                },
                 "avatar": {
                     "description": "模型图标路径",
                     "allOf": [
