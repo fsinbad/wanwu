@@ -325,6 +325,9 @@
           >
             <template slot-scope="scope">
               <uploadImgMd
+                :placeholder="
+                  $t('knowledgeManage.create.chunkContentPlaceholder')
+                "
                 v-model="scope.row.content"
                 :permission-type="permissionType"
                 :knowledgeId="obj.knowledgeId"
@@ -432,6 +435,9 @@
                       ></div>
                       <div v-else class="content-edit">
                         <uploadImgMd
+                          :placeholder="
+                            $t('knowledgeManage.create.chunkContentPlaceholder')
+                          "
                           v-model="segment.content"
                           :permission-type="permissionType"
                           :knowledgeId="obj.knowledgeId"
@@ -626,7 +632,11 @@ export default {
       this.getList(val);
     },
     createChunk(isChildChunk) {
-      this.$refs.createChunk.showDialog(this.obj.id, isChildChunk);
+      this.$refs.createChunk.showDialog(
+        this.obj.id,
+        this.obj.knowledgeId,
+        isChildChunk,
+      );
     },
     updateChildData() {
       setTimeout(() => {

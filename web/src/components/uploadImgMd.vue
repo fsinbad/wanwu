@@ -3,6 +3,7 @@
     class="rich-textarea-wrapper"
     :class="{
       'read-only': isReadOnly,
+      'has-placeholder': showPlaceholder,
     }"
   >
     <div
@@ -16,6 +17,15 @@
       @input="onInput"
       v-html="localContent"
     ></div>
+
+    <!-- placeholder 文字 -->
+    <div
+      v-if="showPlaceholder && !isReadOnly"
+      class="placeholder-text"
+      @click="focusEditor"
+    >
+      {{ placeholder }}
+    </div>
 
     <!-- 只在非只读模式下显示上传按钮 -->
     <el-upload
@@ -52,6 +62,12 @@ export default {
       type: String,
       default: '',
     },
+    placeholder: {
+      type: String,
+      default() {
+        return this.$t('common.input.placeholder');
+      },
+    },
   },
   data() {
     return {
@@ -70,6 +86,10 @@ export default {
     },
     currentValue() {
       return this.value;
+    },
+    showPlaceholder() {
+      // 当没有内容且不是只读模式时显示placeholder
+      return !this.localValue && !this.isReadOnly;
     },
   },
   watch: {
@@ -96,10 +116,15 @@ export default {
       if (newVal !== this.localValue) {
         this.localValue = newVal;
         this.localContent = Md2Img(newVal);
+        this.$refs.editorRef.innerHTML = this.localContent;
       }
     },
   },
   methods: {
+    focusEditor() {
+      if (this.isReadOnly) return;
+      this.$refs.editorRef.focus();
+    },
     uploadOnChange(file) {
       if (file) {
         if (file.size / 1024 / 1024 > this.maxSize) {
@@ -320,6 +345,7 @@ export default {
   outline: none;
   resize: vertical;
   overflow-y: auto;
+  position: relative;
 
   &.read-only {
     background-color: #f5f7fa;
@@ -335,11 +361,27 @@ export default {
 
   .rich-textarea {
     outline: none;
+    min-height: 24px;
   }
 
   &:hover,
   &:focus {
     border: 1px solid var(--color);
   }
+}
+
+.placeholder-text {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  color: #c0c4cc;
+  pointer-events: none;
+  font-style: italic;
+  user-select: none;
+}
+
+.rich-textarea-wrapper.has-placeholder:hover .placeholder-text,
+.rich-textarea-wrapper.has-placeholder:focus .placeholder-text {
+  color: #a8abb2;
 }
 </style>
