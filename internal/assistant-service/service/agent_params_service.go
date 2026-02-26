@@ -80,7 +80,7 @@ func (a *AgentChatParamsBuilder) ModelParams() *AgentChatParamsBuilder {
 	_, modelParams, _ := mp.ToModelParams(modelConfig.Provider, modelConfig.ModelType, modelConfig.Config)
 	buildModelParams(modelParams, params)
 
-	if a.userQueryParams != nil && a.userQueryParams.ConversationId != "" && !a.agent.Draft {
+	if a.userQueryParams != nil && a.userQueryParams.ConversationId != "" {
 		a.postProcessList = append(a.postProcessList, params_process.ConversionHistoryType)
 	}
 
