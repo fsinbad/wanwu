@@ -627,8 +627,9 @@ export default {
             ...this.createForm,
             provider: this.provider.key || '',
             config: {
-              apiKey,
               endpointUrl,
+              ...(this.provider.key !== OLLAMA &&
+                !this.showAppAndAccessKey() && { apiKey }),
               ...(modelType === LLM && { functionCalling, maxTokens }),
               ...(this.showVision() && { visionSupport }),
               ...(this.showContextSize() && { contextSize }),
