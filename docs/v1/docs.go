@@ -9764,7 +9764,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "模型作用域类型",
-                        "name": "ScopeType",
+                        "name": "scopeType",
                         "in": "query"
                     }
                 ],

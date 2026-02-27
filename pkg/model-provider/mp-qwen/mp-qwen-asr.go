@@ -36,7 +36,6 @@ func (cfg *SyncAsr) NewReq(req *mp_common.SyncAsrReq) (mp_common.ISyncAsrReq, er
 			}
 		}
 	}
-	log.Infof("qwen sync_asr audioData req: %v", audioData)
 	m := map[string]interface{}{
 		"model": req.Model,
 		"input": map[string]interface{}{

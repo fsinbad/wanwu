@@ -212,7 +212,7 @@ tools:
   - tool_square_id: "yuanjingmultimodal"
     name: "元景-多模态工具"
     desc: "联通元景多模态生成服务，包括文生图、图生图及首尾帧生成视频等功能"
-    avatar_path: "tool/yuanjingimgs2videoget/logo.png"
+    avatar_path: "tool/yuanjingmultimodal/logo.png"
     detail: "联通元景多模态生成服务，包括文生图、图生图、首尾帧图生视频等功能。可前往 https://maas.ai-yuanjing.com/ 申请API Key"
     tags: "文生图,图生图,图生视频"
     need_api_key_input: true

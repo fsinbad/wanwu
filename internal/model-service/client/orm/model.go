@@ -94,6 +94,7 @@ func (c *Client) UpdateModel(ctx context.Context, tab *model_client.ModelImporte
 		"model_icon_path": tab.ModelIconPath,
 		"publish_date":    tab.PublishDate,
 		"provider_config": tab.ProviderConfig,
+		"scope_type":      tab.ScopeType,
 	}).Error; err != nil {
 		return toErrStatus("model_update_err", err.Error())
 	}
