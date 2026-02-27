@@ -20,8 +20,10 @@ var builderMap = make(map[int]EventBuilder)
 
 type ConversationResp struct {
 	Order                int
+	EventOrder           int
 	EventType            int
 	EventData            *model.SubEventData
+	FullResponseList     []*model.ConversationResponse
 	FullResponse         *strings.Builder
 	SearchList           *string
 	ConversationEventMap map[string]*ConversationResp
@@ -32,7 +34,13 @@ func CreateConversationResp() *ConversationResp {
 	return &ConversationResp{FullResponse: &strings.Builder{}, ConversationEventMap: make(map[string]*ConversationResp)}
 }
 
-func (cr *ConversationResp) Write(data string) {
+func (cr *ConversationResp) Write(data string, order int) {
+	if order != cr.EventOrder {
+		resp := &model.ConversationResponse{Response: cr.FullResponse.String(), Order: cr.EventOrder}
+		cr.EventOrder = order
+		cr.FullResponseList = append(cr.FullResponseList, resp)
+		cr.FullResponse.Reset()
+	}
 	cr.FullResponse.WriteString(data)
 }
 
@@ -56,9 +64,24 @@ func (cr *ConversationResp) Response() string {
 	return conversationResponse
 }
 
+func (cr *ConversationResp) ResponseList() []*model.ConversationResponse {
+	var conversationResponse = cr.FullResponse.String()
+	if cr.Error != nil {
+		//这里面不直接使用stringBuilder 原因是防止Response 被多次调用导致多次生成err
+		if len(conversationResponse) > 0 {
+			conversationResponse += "\n"
+		}
+		conversationResponse += terminationMessage
+	}
+	var retList = cr.FullResponseList
+	retList = append(retList, &model.ConversationResponse{Response: conversationResponse, Order: cr.EventOrder})
+	return retList
+}
+
 type AgentChatResp struct {
 	Code       int                 `json:"code"`
 	Message    string              `json:"message"`
+	Order      int                 `json:"order"`
 	Response   string              `json:"response"`
 	SearchList []interface{}       `json:"search_list"`
 	Finish     int                 `json:"finish"`

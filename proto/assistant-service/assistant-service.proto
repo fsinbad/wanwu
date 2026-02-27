@@ -512,6 +512,11 @@ message GetConversationDetailListResp {
   int32 pageNo = 4;
 }
 
+message ConversationResponse {
+  string response = 1;
+  int32 order = 2;
+}
+
 message ConversionDetailInfo{
   string id = 1;
   string assistantId = 2;
@@ -530,6 +535,7 @@ message ConversionDetailInfo{
   string fileFormat = 15;
   int64 fileSize = 16;
   repeated SubConversation SubConversationList = 17;//子会话相关
+  repeated ConversationResponse ConversationResponse = 18;//主会话详情
 }
 
 message SubConversation {
@@ -542,6 +548,7 @@ message SubConversation {
   int32 status = 7;//1:成功，2：失败
   string conversationType = 8;//subAgent：子智能体；agentTool：主智能体工具；subAgentTool：子智能体工具
   string parentId = 9;//需要挂载的id，为子智能体工具扩展
+  int32 order = 10;//顺序
 }
 
 message RequestFile {

@@ -783,6 +783,7 @@ func GetConversationDetailList(ctx *gin.Context, userId, orgId string, req reque
 			Prompt:              item.Prompt,
 			SysPrompt:           item.SysPrompt,
 			Response:            item.Response,
+			ResponseList:        buildResponseList(item.ConversationResponse),
 			QaType:              item.QaType,
 			CreatedBy:           item.CreatedBy,
 			CreatedAt:           item.CreatedAt,
@@ -806,6 +807,20 @@ func GetConversationDetailList(ctx *gin.Context, userId, orgId string, req reque
 	}
 
 	return response.PageResult{Total: resp.Total, List: convertedList, PageNo: req.PageNo, PageSize: req.PageSize}, nil
+}
+
+func buildResponseList(conversationResponse []*assistant_service.ConversationResponse) []*response.ConversationResponse {
+	if len(conversationResponse) == 0 {
+		return make([]*response.ConversationResponse, 0)
+	}
+	var retList []*response.ConversationResponse
+	for _, resp := range conversationResponse {
+		retList = append(retList, &response.ConversationResponse{
+			Response: resp.Response,
+			Order:    resp.Order,
+		})
+	}
+	return retList
 }
 
 func buildSearchList(searchListStr string) interface{} {
@@ -837,6 +852,7 @@ func buildSubConversationList(conversationList []*assistant_service.SubConversat
 			TimeCost:         conversation.TimeCost,
 			Status:           conversation.Status,
 			ConversationType: conversation.ConversationType,
+			Order:            conversation.Order,
 		})
 	}
 	return subConversationList

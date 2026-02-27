@@ -135,7 +135,7 @@ func NowSpanToHMS(startTime int64) string {
 
 	// 根据天数决定输出格式
 	if days > 0 {
-		return fmt.Sprintf("%d天%02d:%02d:%02d.%03d", days, hours, minutes, seconds, millis)
+		return fmt.Sprintf("%dd%02d:%02d:%02d.%03d", days, hours, minutes, seconds, millis)
 	}
 
 	// 如果有小时
@@ -149,5 +149,5 @@ func NowSpanToHMS(startTime int64) string {
 	}
 
 	// 如果只有秒和毫秒
-	return fmt.Sprintf("%d.%03d秒", seconds, millis)
+	return fmt.Sprintf("%d.%03ds", seconds, millis)
 }

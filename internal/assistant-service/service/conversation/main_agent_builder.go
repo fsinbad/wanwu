@@ -18,7 +18,7 @@ func (*MainAgent) Build(conversationResp *ConversationResp, conversation, search
 	}
 	if len(conversation) > 0 {
 		//保存对话
-		conversationResp.Write(conversation)
+		conversationResp.Write(conversation, agentChatResp.Order)
 	}
 	return nil
 }

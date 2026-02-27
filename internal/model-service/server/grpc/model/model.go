@@ -48,6 +48,7 @@ func (s *Service) UpdateModel(ctx context.Context, req *model_service.ModelInfo)
 			OrgID:  req.OrgId,
 			UserID: req.UserId,
 		},
+		ScopeType: util.MustU32(req.ScopeType),
 	}); err != nil {
 		return nil, errStatus(errs.Code_ModelUpdateModel, err)
 	}

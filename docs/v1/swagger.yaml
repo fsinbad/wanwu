@@ -12894,7 +12894,7 @@ paths:
         type: string
       - description: 模型作用域类型
         in: query
-        name: ScopeType
+        name: scopeType
         type: string
       produces:
       - application/json

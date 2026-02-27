@@ -57,6 +57,10 @@ func (cfg *MultiModalRerank) NewReq(req *mp_common.MultiModalRerankReq) (mp_comm
 		m["return_documents"] = *req.ReturnDocuments
 	}
 
+	if req.TopN != nil {
+		m["top_n"] = *req.TopN
+	}
+
 	return mp_common.NewRerankReq(m), nil
 }
 

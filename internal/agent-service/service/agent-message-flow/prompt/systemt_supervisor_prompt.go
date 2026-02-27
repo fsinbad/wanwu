@@ -18,6 +18,8 @@ const (
 			- Output format: [filename](full URL)
 			- Only output the converted result, without any explanation
 
-		
+		Remove reference information from other agents:
+			- Remove the reference information starts with a citation number like 【x^】
+
 		Note: The output language must be consistent with the language of the user's question.`
 )

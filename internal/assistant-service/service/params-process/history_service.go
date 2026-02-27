@@ -3,6 +3,7 @@ package params_process
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	assistant_service "github.com/UnicomAI/wanwu/api/proto/assistant-service"
 	"github.com/UnicomAI/wanwu/internal/assistant-service/client/model"
@@ -67,12 +68,23 @@ func (k *HistoryProcess) Build(assistant *AgentInfo, prepareParams *AgentPrepare
 			historyList = append(historyList, &assistant_service.ConversionHistory{
 				Query:         detail.Prompt,
 				UploadFileUrl: extractFileUrlsFromModel(detail.FileInfo),
-				Response:      detail.Response,
+				Response:      buildConversationResp(detail.Response, detail.ResponseList),
 			})
 		}
 	}
 	agentChatParams.ModelParams.History = historyList
 	return nil
+}
+
+func buildConversationResp(response string, respList []*model.ConversationResponse) string {
+	if len(respList) == 0 {
+		return response
+	}
+	var retBuilder = strings.Builder{}
+	for _, resp := range respList {
+		retBuilder.WriteString(resp.Response)
+	}
+	return retBuilder.String()
 }
 
 func buildMaxHistory(agent *model.Assistant) int {

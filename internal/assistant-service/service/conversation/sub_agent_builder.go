@@ -24,7 +24,7 @@ func (*SubAgent) Build(conversationResp *ConversationResp, conversation, searchR
 	resp := conversationResp.ConversationEventMap[eventData.Id]
 	if resp == nil {
 		resp = CreateConversationResp()
-		resp.Order = len(conversationResp.ConversationEventMap)
+		resp.Order = eventData.Order
 		conversationResp.ConversationEventMap[eventData.Id] = resp
 	}
 	if resp.SearchList == nil && len(searchResult) > 0 {
@@ -32,7 +32,7 @@ func (*SubAgent) Build(conversationResp *ConversationResp, conversation, searchR
 	}
 	if len(conversation) > 0 {
 		//保存对话
-		resp.Write(conversation)
+		resp.Write(conversation, eventData.Order)
 	}
 	//终态存储
 	if eventData.Status == model.EventEndStatus || eventData.Status == model.EventFailStatus {

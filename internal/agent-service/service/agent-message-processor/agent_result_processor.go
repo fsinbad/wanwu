@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	agent_chat_builder "github.com/UnicomAI/wanwu/internal/agent-service/service/agent-chat-builder"
 	"io"
 	"strings"
 
@@ -92,7 +93,7 @@ func EnioMessageProcessor(respContext *response.AgentChatRespContext, req *reque
 	return func(ctx context.Context, data adk.Message, rawCh chan string) ([]string, *safe_go_util.IteratorError[string]) {
 		messageJSON, _ := json.Marshal(data)
 		log.Infof("enio message %v", string(messageJSON))
-		respList, err := response.NewAgentChatRespWithTool(data, respContext, req)
+		respList, err := agent_chat_builder.BuildChatMessage(req, respContext, data)
 		if err != nil {
 			log.Errorf("MessageOutput error %v", err)
 			return nil, &safe_go_util.IteratorError[string]{

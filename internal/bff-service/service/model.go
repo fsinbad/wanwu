@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	mp_common "github.com/UnicomAI/wanwu/pkg/model-provider/mp-common"
 
 	err_code "github.com/UnicomAI/wanwu/api/proto/err-code"
 	model_service "github.com/UnicomAI/wanwu/api/proto/model-service"
@@ -13,6 +14,16 @@ import (
 	"github.com/UnicomAI/wanwu/pkg/util"
 	"github.com/gin-gonic/gin"
 )
+
+type ModelInfoOptions struct {
+	UserId string
+}
+
+func DefaultModelInfoOptions() *ModelInfoOptions {
+	return &ModelInfoOptions{
+		UserId: "",
+	}
+}
 
 func ImportModel(ctx *gin.Context, userId, orgId string, req *request.ImportOrUpdateModelRequest) error {
 	clientReq, err := parseImportAndUpdateClientReq(userId, orgId, req)
@@ -68,7 +79,7 @@ func GetModel(ctx *gin.Context, userId, orgId string, req *request.GetModelReque
 	if err != nil {
 		return nil, err
 	}
-	return toModelInfo(ctx, resp)
+	return toModelInfo(ctx, resp, &ModelInfoOptions{UserId: userId})
 }
 
 func GetModelById(ctx *gin.Context, req *request.GetModelRequest) (*response.ModelInfo, error) {
@@ -88,7 +99,7 @@ func ListModels(ctx *gin.Context, userId, orgId string, req *request.ListModelsR
 	if err != nil {
 		return nil, err
 	}
-	list, err := toModelInfos(ctx, resp.Models)
+	list, err := toModelInfos(ctx, resp.Models, &ModelInfoOptions{UserId: userId})
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +131,7 @@ func ListTypeModels(ctx *gin.Context, userId, orgId string, req *request.ListTyp
 	if err != nil {
 		return nil, err
 	}
-	list, err := toModelInfos(ctx, resp.Models)
+	list, err := toModelInfos(ctx, resp.Models, &ModelInfoOptions{UserId: userId})
 	if err != nil {
 		return nil, err
 	}
@@ -213,10 +224,10 @@ func parseImportAndUpdateClientReq(userId, orgId string, req *request.ImportOrUp
 	return clientReq, nil
 }
 
-func toModelInfos(ctx *gin.Context, models []*model_service.ModelInfo) ([]*response.ModelInfo, error) {
+func toModelInfos(ctx *gin.Context, models []*model_service.ModelInfo, opts ...*ModelInfoOptions) ([]*response.ModelInfo, error) {
 	var ret []*response.ModelInfo
 	for _, m := range models {
-		info, err := toModelInfo(ctx, m)
+		info, err := toModelInfo(ctx, m, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -225,15 +236,31 @@ func toModelInfos(ctx *gin.Context, models []*model_service.ModelInfo) ([]*respo
 	return ret, nil
 }
 
-func toModelInfo(ctx *gin.Context, modelInfo *model_service.ModelInfo) (*response.ModelInfo, error) {
+func toModelInfo(ctx *gin.Context, modelInfo *model_service.ModelInfo, opts ...*ModelInfoOptions) (*response.ModelInfo, error) {
 	modelConfig, err := mp.ToModelConfig(modelInfo.Provider, modelInfo.ModelType, modelInfo.ProviderConfig)
 	if err != nil {
 		return nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("model %v get model config err: %v", modelInfo.ModelId, err))
 	}
-	tags, err := mp.ToModelTags(modelInfo.Provider, modelInfo.ModelType, modelInfo.ProviderConfig)
+	// 先获取模型公开范围标签
+	scopeTags := mp_common.GetTagsByScopeType(modelInfo.ScopeType)
+
+	// 获取模型基础标签
+	baseTags, err := mp.ToModelTags(modelInfo.Provider, modelInfo.ModelType, modelInfo.ProviderConfig)
 	if err != nil {
 		return nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("model %v get model tags err: %v", modelInfo.ModelId, err))
 	}
+
+	tags := append(scopeTags, baseTags...)
+
+	// 判断模型是否支持 编辑
+	option := DefaultModelInfoOptions()
+	if len(opts) > 0 && opts[0] != nil {
+		if opts[0].UserId != "" {
+			option.UserId = opts[0].UserId
+		}
+	}
+	allowEdit := modelInfo.UserId == option.UserId
+
 	res := &response.ModelInfo{
 		ModelId:     modelInfo.ModelId,
 		Uuid:        modelInfo.Uuid,
@@ -252,6 +279,7 @@ func toModelInfo(ctx *gin.Context, modelInfo *model_service.ModelInfo) (*respons
 		Config:      modelConfig,
 		Tags:        tags,
 		ScopeType:   modelInfo.ScopeType,
+		AllowEdit:   allowEdit,
 	}
 	if res.DisplayName == "" {
 		res.DisplayName = res.Model

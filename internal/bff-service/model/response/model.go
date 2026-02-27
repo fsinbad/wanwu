@@ -25,4 +25,5 @@ type ModelInfo struct {
 	Config      interface{}             `json:"config"`
 	Examples    *mp.ProviderModelConfig `json:"examples,omitempty"` // 仅用于swagger展示；模型对应供应商中的对应llm、embedding或rerank结构是config实际的参数
 	ScopeType   string                  `json:"scopeType"`
+	AllowEdit   bool                    `json:"allowEdit"` // 是否允许前端编辑（true: 允许编辑，false: 隐藏编辑按钮）
 }

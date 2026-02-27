@@ -150,21 +150,22 @@ func (s *Service) GetConversationDetailList(ctx context.Context, req *assistant_
 		}
 
 		conversationDetails = append(conversationDetails, &assistant_service.ConversionDetailInfo{
-			Id:                  detail.Id,
-			AssistantId:         detail.AssistantId,
-			ConversationId:      detail.ConversationId,
-			Prompt:              detail.Prompt,
-			SysPrompt:           detail.SysPrompt,
-			Response:            detail.Response,
-			SearchList:          detail.SearchList,
-			QaType:              detail.QaType,
-			CreatedBy:           detail.UserId, // 使用CreatedBy字段映射UserId
-			CreatedAt:           detail.CreatedAt,
-			UpdatedAt:           detail.UpdatedAt,
-			RequestFiles:        transRequestFiles(detail.FileInfo),
-			FileSize:            detail.FileSize,
-			FileName:            detail.FileName,
-			SubConversationList: buildSubConversationList(detail.SubConversationDetailList),
+			Id:                   detail.Id,
+			AssistantId:          detail.AssistantId,
+			ConversationId:       detail.ConversationId,
+			Prompt:               detail.Prompt,
+			SysPrompt:            detail.SysPrompt,
+			Response:             detail.Response,
+			SearchList:           detail.SearchList,
+			QaType:               detail.QaType,
+			CreatedBy:            detail.UserId, // 使用CreatedBy字段映射UserId
+			CreatedAt:            detail.CreatedAt,
+			UpdatedAt:            detail.UpdatedAt,
+			RequestFiles:         transRequestFiles(detail.FileInfo),
+			FileSize:             detail.FileSize,
+			FileName:             detail.FileName,
+			SubConversationList:  buildSubConversationList(detail.SubConversationDetailList, len(detail.ResponseList) == 0),
+			ConversationResponse: buildConversationResponse(detail.Response, detail.ResponseList, len(detail.SubConversationDetailList)),
 		})
 	}
 
@@ -301,21 +302,39 @@ func buildAgentSendRequest(req *assistant_service.AssistantConversionStreamReq) 
 	}
 }
 
-func buildSubConversationList(subConversationDetailList []*model.SubConversationDetail) []*assistant_service.SubConversation {
-	if len(subConversationDetailList) == 0 {
-		return make([]*assistant_service.SubConversation, 0)
+func buildConversationResponse(response string, conversation []*model.ConversationResponse, startOrder int) []*assistant_service.ConversationResponse {
+	if len(conversation) == 0 {
+		return []*assistant_service.ConversationResponse{{Response: response, Order: int32(startOrder)}}
 	}
-	var retList []*assistant_service.SubConversation
-	for _, detail := range subConversationDetailList {
-		retList = append(retList, buildSubConversation(detail))
+	var retList []*assistant_service.ConversationResponse
+	for _, resp := range conversation {
+		retList = append(retList, &assistant_service.ConversationResponse{
+			Response: resp.Response,
+			Order:    int32(resp.Order),
+		})
 	}
 	return retList
 }
 
-func buildSubConversation(detail *model.SubConversationDetail) *assistant_service.SubConversation {
+func buildSubConversationList(subConversationDetailList []*model.SubConversationDetail, oldData bool) []*assistant_service.SubConversation {
+	if len(subConversationDetailList) == 0 {
+		return make([]*assistant_service.SubConversation, 0)
+	}
+	var retList []*assistant_service.SubConversation
+	for idx, detail := range subConversationDetailList {
+		retList = append(retList, buildSubConversation(detail, idx, oldData))
+	}
+	return retList
+}
+
+func buildSubConversation(detail *model.SubConversationDetail, index int, oldData bool) *assistant_service.SubConversation {
 	data := detail.EventData
 	if data == nil {
 		data = &model.SubEventData{}
+	}
+	var order = detail.Order
+	if oldData {
+		order = index
 	}
 	return &assistant_service.SubConversation{
 		Response:         detail.Content,
@@ -326,5 +345,6 @@ func buildSubConversation(detail *model.SubConversationDetail) *assistant_servic
 		TimeCost:         data.TimeCost,
 		Status:           int32(data.Status),
 		ConversationType: string(detail.ConversationType),
+		Order:            int32(order),
 	}
 }

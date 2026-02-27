@@ -160,7 +160,8 @@ func buildConversationDetail(req *ConversationParams, conversationResp *conversa
 		ConversationId:            req.ConversationId,
 		Prompt:                    req.Query,
 		FileInfo:                  req.FileInfo,
-		Response:                  conversationResp.Response(),
+		ResponseList:              conversationResp.ResponseList(),
+		Response:                  conversationResp.Response(), //todo 联调完删除
 		SearchList:                conversationResp.References(),
 		UserId:                    req.UserId,
 		OrgId:                     req.OrgId,
@@ -188,6 +189,7 @@ func buildSubConversationDetailList(conversationResp *conversation.ConversationR
 		retList = append(retList, &model.SubConversationDetail{
 			BusinessId:       subConversationResp.EventData.Id,
 			ConversationType: buildConversationType(subConversationResp.EventType),
+			Order:            subConversationResp.Order,
 			Content:          subConversationResp.Response(),
 			SearchList:       subConversationResp.References(),
 			EventData:        subConversationResp.EventData,

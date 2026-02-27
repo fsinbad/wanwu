@@ -181,6 +181,12 @@ func ToModelTags(provider, modelType, cfg string) ([]mp_common.Tag, error) {
 				return nil, fmt.Errorf("unmarshal model config err: %v", err)
 			}
 			tags = embedding.Tags()
+		case ModelTypeSyncAsr:
+			asr := &mp_huoshan.SyncAsr{}
+			if err := json.Unmarshal([]byte(cfg), asr); err != nil {
+				return nil, fmt.Errorf("unmarshal model config err: %v", err)
+			}
+			tags = asr.Tags()
 		default:
 			return nil, fmt.Errorf("ToModelTags:invalid provider %v model type %v", provider, modelType)
 		}
@@ -385,6 +391,8 @@ func ToModelConfig(provider, modelType, cfg string) (interface{}, error) {
 			ret = &mp_huoshan.LLM{}
 		case ModelTypeTextEmbedding:
 			ret = &mp_huoshan.Embedding{}
+		case ModelTypeSyncAsr:
+			ret = &mp_huoshan.SyncAsr{}
 		default:
 			return nil, fmt.Errorf("ToModelConfig:invalid provider %v model type %v", provider, modelType)
 		}

@@ -584,6 +584,7 @@ func getSyncAsrReqByProvider(ctx *gin.Context, modelInfo *model_service.ModelInf
 				Role: "user",
 				Content: []mp_common.SyncAsrReqC{
 					{
+						Type: mp_common.MultiModalTypeMinioUrl,
 						Audio: mp_common.SyncAsrAudio{
 							Data: base64StrWithPrefix,
 						},
@@ -594,10 +595,7 @@ func getSyncAsrReqByProvider(ctx *gin.Context, modelInfo *model_service.ModelInf
 	}
 	switch modelInfo.Provider {
 	case mp.ProviderYuanJing:
-		req.Messages[0].Content[0].Type = mp_common.MultiModalTypeMinioUrl
 		req.Messages[0].Content[0].Audio.FileName = "test.wav"
-	case mp.ProviderQwen:
-		req.Messages[0].Content[0].Type = mp_common.MultiModalTypeAudio
 	}
 	return req, nil
 }
