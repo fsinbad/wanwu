@@ -137,6 +137,9 @@ The platform has been successfully applied in multiple industries such as **fina
   - v0.1.8 and earlier: wanwu-agentscope project
   - v0.2.0 and later: [wanwu-workflow](https://github.com/UnicomAI/wanwu-workflow/tree/dev/wanwu-backend) project
 
+- **Recommended Configuration:**
+  - CPU: 8-core or 16-core; RAM: 32GB; Storage: 200GB or more; GPU: Not required.
+  
 - **Docker Installation (Recommended)**
 
 1. Before the first run
@@ -364,6 +367,6 @@ The Yuanjing Wanwu AI Agent Platform is released under the Apache License 2.0.
 ------
 
 ### &#x1F4E9; Contact Us
-| QQ Group1(Full):490071123                                    | QQ Group2:1026898615                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> |
+| QQ Group1(Full):490071123                                    | QQ Group2:1026898615                                         | QQ Group3:1019579243                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> | ![image-20260225161516074](assets/image-20260225161516074.png) |
