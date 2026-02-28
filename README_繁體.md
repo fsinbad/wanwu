@@ -137,6 +137,9 @@
   - v0.1.8及以前：wanwu-agentscope 項目
   - v0.2.0開始：[wanwu-workflow](https://github.com/UnicomAI/wanwu-workflow/tree/dev/wanwu-backend) 項目
 
+- **建議配置：**
+  - CPU：8核或16核；記憶體：32G；硬碟：200G以上；GPU：不需要
+  
 - **Docker安裝（推薦）**
 
 1. 首次運行前
@@ -370,6 +373,6 @@
 元景萬悟智能體平台根據Apache License 2.0發布。
 
 ### &#x1F4E9; 聯繫我們
-| QQ 群1(已滿):490071123                                    | QQ 群2:1026898615                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> |
+| QQ 群1(已滿):490071123                                       | QQ 群2:1026898615                                            | QQ 群3:1019579243                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> | ![image-20260225161530372](assets/image-20260225161530372.png) |

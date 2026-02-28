@@ -150,6 +150,9 @@
   - v0.1.8及以前：wanwu-agentscope 项目
   - v0.2.0开始：[wanwu-workflow](https://github.com/UnicomAI/wanwu-workflow/tree/dev/wanwu-backend) 项目
 
+- **推荐配置：**
+  - CPU：8核或16核 ；内存：32G ；硬盘200G以上；GPU不需要
+  
 - **Docker安装（推荐）**
 
 1. 首次运行前
@@ -392,6 +395,6 @@
 ------
 
 ### &#x1F4E9; 联系我们
-| QQ 群1(已满):490071123                                    | QQ 群2:1026898615                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> |
+| QQ 群1(已满):490071123                                       | QQ 群2:1026898615                                            | QQ 群3:1019579243                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/010f1d68-78e9-446d-baf1-0a7339efb48e" /> | <img width="183" height="258" alt="image" src="https://github.com/user-attachments/assets/10796f69-5c18-4f21-adbb-b22b6ef88df2" /> | ![5adf6c107875a9efbff2da978817bd32](assets/image-20260225161530372.png) |

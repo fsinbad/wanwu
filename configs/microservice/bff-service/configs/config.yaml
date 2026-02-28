@@ -111,7 +111,7 @@ doc-center:
     - key: model
       val: 模型导入方式-详细版.md
     - key: knowledge
-      val: 2.资源库/知识库/创建知识库、问答库/创建知识库/创建内部知识库.md
+      val: 2.资源库/知识库/创建知识库、问答库/创建内部知识库.md
     - key: knowledge-hit
       val: 2.资源库/知识库/命中测试/创建命中测试.md
     - key: knowledge-keywords
