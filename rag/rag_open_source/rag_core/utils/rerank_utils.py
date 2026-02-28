@@ -137,7 +137,7 @@ def model_rerank(query: dict|str,
     for doc in documents:
         if isinstance(doc, dict):
             for key, value in doc.items():
-                if key == "image" and not value.startswith(f"http://{MINIO_ADDRESS}"):
+                if key == "image" and not value.startswith(f"http://{MINIO_ADDRESS}") and REPLACE_MINIO_DOWNLOAD_URL in value:
                     suffix = value.replace(REPLACE_MINIO_DOWNLOAD_URL, "").lstrip("/")
                     doc[key] = f"http://{MINIO_ADDRESS}/{suffix}"
 

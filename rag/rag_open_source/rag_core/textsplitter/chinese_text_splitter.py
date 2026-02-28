@@ -1,7 +1,7 @@
 from langchain.text_splitter import CharacterTextSplitter
 import re
 import os
-from typing import List
+from typing import List, Tuple
 
 
 def process_string(long_str, punctuation_list, size):  
@@ -70,6 +70,28 @@ def replace_k_consecutive_nl(separator: str, text: str) -> (str, str):
 
     pattern = re.compile(rf'\n{{{k}}}')
     return '<NLS>', pattern.sub('<NLS>', text)
+
+IMG_PATTERN = r'!\[[^\]]*\]\([^\s)]+(?:\s+"[^"]*")?\)'
+
+def protect_images(text: str) -> Tuple[str, List[str]]:
+    """将图片标签替换为占位符，并返回占位符列表"""
+    images = re.findall(IMG_PATTERN, text)
+    for i, img in enumerate(images):
+        # 使用特殊标记替换，例如 <IMG_PROTECT_0>
+        text = text.replace(img, f"<IMG_PROTECT_{i}>", 1)
+    return text, images
+
+
+def restore_images(chunks: List[str], images: List[str]) -> List[str]:
+    """将切分后的 chunk 中的占位符还原回图片标签"""
+    restored_chunks = []
+    for chunk in chunks:
+        for i, img in enumerate(images):
+            placeholder = f"<IMG_PROTECT_{i}>"
+            if placeholder in chunk:
+                chunk = chunk.replace(placeholder, img)
+        restored_chunks.append(chunk)
+    return restored_chunks
 
 
 class ChineseTextSplitter(CharacterTextSplitter):
@@ -404,12 +426,16 @@ class ChineseTextSplitter(CharacterTextSplitter):
 
 
     def split_text(self, text: str) -> List[str]:
-        if self.chunk_type == 'split_by_default':
-            return self.split_text1(text)
-        elif self.chunk_type == 'split_by_design':
-            return self.split_text_by_custom_separators(text)
+        # 保护markdown格式图片链接
+        protected_text, saved_images = protect_images(text)
+
+        if self.chunk_type == 'split_by_design':
+            chunks = self.split_text_by_custom_separators(protected_text)
         else:
-            return self.split_text1(text)
+            chunks = self.split_text1(protected_text)
+
+        # 还原图片
+        return restore_images(chunks, saved_images)
 
 if __name__ == "__main__":
     # question = input('Please enter your question: ')

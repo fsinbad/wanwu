@@ -192,7 +192,7 @@ def asr_parser_text(file_path, asr_model_id):
     minio_result = minio_utils.upload_local_file(new_file_path)
     if minio_result['code'] == 0:
         wav_url = minio_result['download_link']
-        if not wav_url.startswith(f"http://{MINIO_ADDRESS}"):
+        if not wav_url.startswith(f"http://{MINIO_ADDRESS}") and REPLACE_MINIO_DOWNLOAD_URL in wav_url:
             suffix = wav_url.replace(REPLACE_MINIO_DOWNLOAD_URL, "").lstrip("/")
             wav_url = f"http://{MINIO_ADDRESS}/{suffix}"
 
@@ -248,7 +248,7 @@ def asr_parser_chunk(file_path, asr_model_id):
 
     if minio_result['code'] == 0:
         wav_url = minio_result['download_link']
-        if not wav_url.startswith(f"http://{MINIO_ADDRESS}"):
+        if not wav_url.startswith(f"http://{MINIO_ADDRESS}") and REPLACE_MINIO_DOWNLOAD_URL in wav_url:
             suffix = wav_url.replace(REPLACE_MINIO_DOWNLOAD_URL, "").lstrip("/")
             wav_url = f"http://{MINIO_ADDRESS}/{suffix}"
 

@@ -353,6 +353,47 @@ async def search(request: Request):
         logger.info(f"llm_url:{llm_url},发送到大模型参数：{llm_data}")
         return send_request(llm_url, api_key, llm_data, valid_search_list)
 
+    def curate_reference_text(text: str) -> str:
+        """
+
+        只会处理真正的“列表编号”
+        不会破坏 URL / 端口号 / 浮点数 / 页码 / 图片链接
+        """
+
+        # ========= 保护 URL =========
+        url_pattern = r'https?://[^\s)]+'
+        urls = re.findall(url_pattern, text)
+
+        protected = text
+        for i, url in enumerate(urls):
+            protected = protected.replace(url, f"__URL_PLACEHOLDER_{i}__")
+
+        # ========= 保护 Markdown 图片 =========
+        md_img_pattern = r'!\[[^\]]*\]\([^)]+\)'
+        images = re.findall(md_img_pattern, protected)
+
+        for i, img in enumerate(images):
+            protected = protected.replace(img, f"__IMG_PLACEHOLDER_{i}__")
+
+        # ========= 匹配真正的编号 =========
+        pattern = r'(?x)(?<![a-zA-Z0-9])(\(?\d+(?:\.\d+)*\)?)([\.．、\)]+[\s]*)(?!分钟|秒|小时|个|只|次|℃|\d)'
+        def replace_func(match):
+            num = match.group(1)
+            # 增加分割线和换行，强制切断语义连续性
+            return f"\n【编号 {num}】**: "
+
+        structured = re.sub(pattern, replace_func, protected, flags=re.VERBOSE)
+
+        # ========= 还原图片 =========
+        for i, img in enumerate(images):
+            structured = structured.replace(f"__IMG_PLACEHOLDER_{i}__", img)
+
+        # ========= 还原 URL =========
+        for i, url in enumerate(urls):
+            structured = structured.replace(f"__URL_PLACEHOLDER_{i}__", url)
+
+        return structured
+
 
     async def multimodal_stream_generate(prompt, history, search_list, question, top_p, repetition_penalty, temperature,
                               custom_model_info, do_sample, score, msg_id, attachment_files, llm_config):
@@ -374,7 +415,7 @@ async def search(request: Request):
         available_tokens_for_context = context_size - max_tokens - 50  # 50 for buffer
         # === 多模态问答提示词构建
         citation = CITATION_INSTRUCTION if auto_citation else ""
-        content_item = {"type": "text", "text": f"你是一个问答助手，主要任务是汇总参考信息回答用户问题, 请只根据参考信息中提供的上下文信息回答用户问题。 {citation}"}
+        content_item = {"type": "text", "text": f"你是一个问答助手，主要任务是汇总参考信息回答用户问题, 请只根据参考信息中提供的上下文信息回答用户问题，**禁止**直接通过视觉形状猜测功能（必须严格执行）。**严禁**绕过编号仅凭视觉形状相似性进行主观推断（必须严格执行）。 {citation}"}
         prompt_content.append(content_item)
         content_item = {"type": "text", "text": f"用户问题：{question}"}
         prompt_content.append(content_item)
@@ -387,18 +428,23 @@ async def search(request: Request):
             prompt_content.extend(content_items)
         prompt_content.append({"type": "text", "text": "\n参考信息：```\n"})
         num_tokens += calculate_multimodal_tokens(prompt_content)
-        end_content_item = {"type": "text", "text": "请根据参考信息回答用户问题，请严格按照以下要求输出：\n1. **参考信息中提及图片链接情况的输出要求**：若参考信息提及图片链接且链接格式符合markdown语法规范：“![图片标题](图片链接)” 。请按此链接格式将相关图像内容附加输出，注意确保图片链接格式完整不被截断。若参考信息未提及图片链接则忽略此规则并注意不要随意捏造图片链接，在答案输出中不要体现此条指令信息的任何内容。\n2. **输出语言要求**：必须使用与问题相同的语言回答用户的问题。\n"}
+        end_content_item = {"type": "text",
+                            "text": "请根据参考信息回答用户问题，请严格按照以下要求输出：\n"
+                                    "1. **参考信息中提及图片链接情况的输出要求**：若参考信息提及图片链接且链接格式符合markdown语法规范：“![图片标题](图片链接)” 。请按此链接格式将相关图像内容附加输出，注意确保图片链接格式完整不被截断。若参考信息未提及图片链接则忽略此规则并注意不要随意捏造图片链接，在答案输出中不要体现此条指令信息的任何内容。\n"
+                                    "2. **输出语言要求**：必须使用与问题相同的语言回答用户的问题。\n"
+                            }
         num_tokens += calculate_multimodal_tokens([end_content_item])
         valid_search_list = []
         for i, item in enumerate(search_list):
+            processed_snippet = curate_reference_text(item['snippet'])
             content_items = [
                 {"type": "text", "text": f"\n【{i + 1}^】\n"},
-                {"type": "text", "text": f"{item['snippet']}\n"}
+                {"type": "text", "text": f"{processed_snippet}\n"}
             ]
             for rerank_i in item["rerank_info"]:
                 if rerank_i["type"] == "image":
                     file_url = rerank_i['file_url']
-                    if not file_url.startswith(f"http://{MINIO_ADDRESS}"):
+                    if not file_url.startswith(f"http://{MINIO_ADDRESS}") and REPLACE_MINIO_DOWNLOAD_URL in file_url:
                         suffix = file_url.replace(REPLACE_MINIO_DOWNLOAD_URL, "").lstrip("/")
                         file_url = f"http://{MINIO_ADDRESS}/{suffix}"
                     content_items.append({"type": "text", "text": f"\n此 {rerank_i['file_url']} 的图片是:"})
@@ -411,6 +457,17 @@ async def search(request: Request):
             valid_search_list.append(item)
         prompt_content.append({"type": "text", "text": "\n```\n"})  # 添加好参考信息分界
         prompt_content.append(end_content_item)
+        prompt_content.append({
+            "type": "text",
+            "text": (
+                "### 视觉与文本映射标准 SOP（必须严格执行）：\n"
+                "若用户有上传图片并询问图中特定位置的功能，请按以下步骤思考并回答：\n\n"
+                "1. **物理定位**：描述该图标在整体布局中的位置（如：底部工具栏左起第 N 个）。\n"
+                "2. **示意图对齐**：在参考图中寻找相同位置，若该位置存在明确【编号 X】，锁定对应的【编号 X】, 继续执行步骤 3 和 4，若该位置不存在编号，立即停止，不得进行检索或功能推导\n"
+                "3. **原文检索与摘抄**：在参考文本中查找 **【编号 X】** 后的文字。\n"
+                "4. **功能推导**：基于摘抄的文字得出结论。**警告：严禁根据图标形状自行猜测，必须以文字定义为准。**\n\n"
+            )
+        })
         # ===== 多模态提示词构建完成
         messages = []
         for item in history:

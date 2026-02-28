@@ -147,7 +147,7 @@ def get_multimodal_embs(inputs: List[dict], embedding_model_id=""):
         if "text" in item:
             clean_item["text"] = item["text"]
         if "image" in item:
-            if not item["image"].startswith(f"http://{MINIO_ADDRESS}"):
+            if not item["image"].startswith(f"http://{MINIO_ADDRESS}") and REPLACE_MINIO_DOWNLOAD_URL in item["image"]:
                 suffix = item["image"].replace(REPLACE_MINIO_DOWNLOAD_URL, "").lstrip("/")
                 clean_item["image"] = f"http://{MINIO_ADDRESS}/{suffix}"
             else:

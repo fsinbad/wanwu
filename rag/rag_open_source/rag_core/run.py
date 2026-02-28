@@ -759,6 +759,7 @@ def batchAddChildChunks(request_json=None):
 @validate_request
 def updateChunk(request_json=None):
     logger.info('---------------更新分段---------------')
+    logger.info(f"更新分段参数：{request_json}")
     try:
         user_id = request_json.get('userId')
         kb_name = request_json.get("knowledgeBase", "")

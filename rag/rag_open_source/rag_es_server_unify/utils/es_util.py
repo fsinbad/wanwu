@@ -204,7 +204,11 @@ def get_index_update_content_actions(index_name, kb_name, content_id, chunk_curr
     query = {
         "query": {
             "bool": {
-                "must": must_conditions
+                "must": must_conditions,
+                # 过滤掉 content_type 为 image
+                "must_not": [
+                    {"term": {"content_type": "image"}}
+                ]
             }
         }
     }
@@ -1403,7 +1407,6 @@ def delete_child_chunks(index_name, kb_name, content_id, chunk_current_num, chil
                 deleted_num += res[0]
                 delete_actions = []  # 清空 delete_actions
         if len(delete_actions) > 0:
-            logger.info(f"索引 '{index_name}' kb_name:{kb_name} , 删除文档数量: {deleted_num}")
             # 最后的残留 bulk API 也批量删除
             res = helpers.bulk(es, delete_actions)
             deleted_num += res[0]
@@ -1419,6 +1422,75 @@ def delete_child_chunks(index_name, kb_name, content_id, chunk_current_num, chil
         }
 
     return delete_status
+
+
+def delete_image_chunks(index_name, kb_name, chunk_current_nums, child_chunk_current_nums=None):
+    """
+    通用删除图片向量函数：支持按父分段列表删除，或按父分段+子分段列表精确删除。
+
+    参数:
+    index_name: 索引名称
+    kb_name: 知识库名称
+    chunk_current_nums: chunk_current_num 列表（如果是精确匹配子段，传单个数字的列表或数字即可）
+    child_chunk_current_nums: (可选) 子分段编号列表，若提供则执行更细粒度的删除
+    """
+    # 1. 基础查询条件
+    must_conditions = [
+        {"term": {"kb_name": kb_name}},
+        {"term": {"content_type": "image"}}
+    ]
+
+    # 2. 处理 chunk_current_num
+    if isinstance(chunk_current_nums, list):
+        must_conditions.append({"terms": {"meta_data.chunk_current_num": chunk_current_nums}})
+    else:
+        must_conditions.append({"term": {"meta_data.chunk_current_num": chunk_current_nums}})
+
+    # 3. 如果提供了子段 ID，添加子段过滤条件
+    if child_chunk_current_nums:
+        must_conditions.append({"terms": {"meta_data.child_chunk_current_num": child_chunk_current_nums}})
+
+    query = {"query": {"bool": {"must": must_conditions}}}
+
+    try:
+        deleted_num = 0
+        delete_actions = []
+
+        # 使用 scan 滚动查询
+        scan_kwargs = {
+            "index": index_name,
+            "query": query,
+            "scroll": "1m",
+            "size": 100
+        }
+
+        for doc in helpers.scan(es, **scan_kwargs):
+            delete_actions.append({
+                "_op_type": "delete",
+                "_index": index_name,
+                "_id": doc['_id']
+            })
+
+            # 达到批次大小后执行 bulk
+            if len(delete_actions) >= DELETE_BACTH_SIZE:
+                res = helpers.bulk(es, delete_actions)
+                deleted_num += res[0]
+                logger.info(f"索引 '{index_name}' 正在删除... 已删除: {deleted_num}")
+                delete_actions = []
+
+        # 处理剩余的动作
+        if delete_actions:
+            res = helpers.bulk(es, delete_actions)
+            deleted_num += res[0]
+
+        es.indices.refresh(index=index_name)
+        logger.info(f"索引 '{index_name}' 删除任务完成，共计删除: {deleted_num}")
+
+        return {"success": True, "deleted": deleted_num}
+
+    except Exception as e:
+        logger.error(f"删除图片向量失败: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 def add_file(file_index_name, kb_name, file_name, file_meta):
     try:
@@ -1736,23 +1808,30 @@ def update_cc_content_status(index_name, kb_name, file_name, content_id, status,
             }
             return result
 
-def get_child_contents(index_name, kb_name, content_id):
+def get_child_contents(index_name, kb_name, content_id, child_chunk_current_num: int  = None):
     """ 获取子分段"""
+    # 匹配知识库名称
+    must_conditions = [{"term": {"kb_name": kb_name}}]
+
+    # 匹配 content_id (兼容 text 和 keyword 类型)
+    must_conditions.append({
+        "bool": {
+            "should": [
+                {"term": {"content_id": content_id}},
+                {"term": {"content_id.keyword": content_id}}
+            ],
+            "minimum_should_match": 1
+        }
+    })
+
+    # 动态处理 child_chunk_current_num
+    if child_chunk_current_num is not None:
+        must_conditions.append({"term": {"meta_data.child_chunk_current_num": child_chunk_current_num}})
+
     query = {
         "query": {
             "bool": {
-                "must": [
-                    {"term": {"kb_name": kb_name}},
-                    {
-                        "bool": {
-                            "should": [
-                                {"term": {"content_id": content_id}},
-                                {"term": {"content_id.keyword": content_id}}
-                            ],
-                            "minimum_should_match": 1
-                        }
-                    }
-                ]
+                "must": must_conditions
             }
         },
         "size": 500,  # 增加返回的条数
@@ -1769,23 +1848,31 @@ def get_child_contents(index_name, kb_name, content_id):
     response = es.search(index=index_name, body=query)
     # 遍历搜索结果，填充列表
     result = []
+    parent_content = ""
+    attachment_files = []
     for hit in response["hits"]["hits"]:
         cleaned_hit = {k: v for k, v in hit['_source'].items()
                    if (not k.startswith('vector') and k != 'content_vector')}
         embedding_content = cleaned_hit["embedding_content"]
+
+        if "content_type" in cleaned_hit and cleaned_hit["content_type"] == "image":
+            attachment_files.append({"file_type": "image", "file_url": embedding_content})
+            continue
+
+        parent_content = cleaned_hit["content"]
         cleaned_hit["content"] = embedding_content
         cleaned_hit.pop("embedding_content")
-        if "content_type" in cleaned_hit and cleaned_hit["content_type"] == "image":
-            continue
         result.append(cleaned_hit)
 
     # 获取匹配总数
     total_hits = response['hits']['total']['value']
 
     return {
+        "parent_content": parent_content,
         "parent_chunk_id": content_id,
         "child_content_list": result,
-        "child_chunk_total_num": int(total_hits)
+        "child_chunk_total_num": int(total_hits),
+        "attachment_files": attachment_files
     }
 
 

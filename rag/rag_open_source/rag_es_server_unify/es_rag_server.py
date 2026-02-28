@@ -145,6 +145,9 @@ def add_vector_data(request_json=None):
     for doc in copy.deepcopy(doc_list):
         cc_str = str(doc["content"]) + doc["file_name"] + str(doc["meta_data"]["chunk_current_num"])
         if cc_str not in cc_duplicate_list:
+            # 提取的多模态数据content_type 是 image，就不写 content 主控表，只写向量表
+            if "content_type" in doc and doc["content_type"] == "image":
+                continue
             doc.pop("embedding_content")  # 去掉不需要的字段
             doc["content_type"] = "text"  # 主控表都是 text
             doc["status"] = True  # 初始化启停状态
@@ -718,11 +721,12 @@ def get_child_content_list(request_json=None):
     display_kb_name = request_json.get("kb_name")  # 显示的名字
     file_name = request_json.get("file_name")
     chunk_id = request_json.get("chunk_id")
+    child_chunk_current_num = request_json.get("child_chunk_current_num", None)
     try:
         kb_name = kb_info_ops.get_uk_kb_id(userId, display_kb_name)  # 从映射表中获取 kb_id ，这是真正的名字
         logger.info(
             f"用户:{userId},请求的kb_name为:{kb_name},file_name:{file_name},chunk_id:{chunk_id}")
-        content_result = es_ops.get_child_contents(index_name, kb_name, chunk_id)
+        content_result = es_ops.get_child_contents(index_name, kb_name, chunk_id, child_chunk_current_num)
         result = {
             "code": 0,
             "message": "success",
@@ -765,6 +769,10 @@ def update_child_chunk(request_json=None):
         kb_name = kb_info_ops.get_uk_kb_id(userId, display_kb_name)  # 从映射表中获取 kb_id ，这是真正的名字
         logger.info(f"用户:{userId},display_kb_name: {display_kb_name},请求的kb_name为:{kb_name}, chunk_id: {chunk_id}, "
                     f"chunk_current_num: {chunk_current_num}, child_chunk: {child_chunk}")
+
+        # 更新子分段前，先删除旧的图片向量
+        es_image_delete_result = es_ops.delete_image_chunks(index_name, kb_name, chunk_current_num, [child_chunk_current_num])
+        logger.info(f"用户:{userId},知识库:{kb_name}, 更新子分段前删除旧图片向量结果: {es_image_delete_result}")
 
         if is_multimodal_model(embedding_model_id):  # 多模态模型则按多模态去编码
             inputs = [{"text": child_content}]
@@ -861,9 +869,22 @@ def batch_delete_chunks(request_json=None):
         logger.info(
             f"用户:{userId},display_kb_name: {display_kb_name},请求的kb_name为:{kb_name},file_name:{file_name}, chunk_ids: {chunk_ids}")
 
+        # 删除分段前，先获取要删除分段的chunk_current_num列表，用于删除关联的图片向量
+        chunk_current_nums = []
+        contents = es_ops.get_contents_by_ids(content_index_name, kb_name, chunk_ids)
+        for content in contents:
+            if "meta_data" in content and "chunk_current_num" in content["meta_data"]:
+                chunk_current_nums.append(content["meta_data"]["chunk_current_num"])
+
         es_result = es_ops.delete_chunks_by_content_ids(index_name, kb_name, chunk_ids)
         es_cc_result = es_ops.delete_chunks_by_content_ids(content_index_name, kb_name, chunk_ids)  # 主控表也需要删除
         es_snippet_result = es_ops.delete_chunks_by_content_ids(snippet_index_name, kb_name, chunk_ids)
+
+        # 删除关联的图片向量
+        if chunk_current_nums:
+            es_image_result = es_ops.delete_image_chunks(index_name, kb_name, chunk_current_nums)
+            logger.info(f"用户:{userId},知识库:{kb_name}, 删除图片向量结果: {es_image_result}")
+
         if es_result["success"] and es_cc_result["success"] and es_snippet_result["success"]:
             logger.info(f"用户{index_name},对应的知识库{kb_name}, chunks: {chunk_ids}记录分段删除成功")
             result = {
@@ -926,6 +947,11 @@ def delete_child_chunks(request_json=None):
 
         es_result = es_ops.delete_child_chunks(index_name, kb_name, chunk_id, chunk_current_num, child_chunk_current_nums)
         es_snippet_result = es_ops.delete_child_chunks(snippet_index_name, kb_name, chunk_id, chunk_current_num, child_chunk_current_nums)
+
+        # 删除关联的子分段图片向量
+        es_image_result = es_ops.delete_image_chunks(index_name, kb_name, chunk_current_num, child_chunk_current_nums)
+        logger.info(f"用户:{userId},知识库:{kb_name}, 删除子分段图片向量结果: {es_image_result}")
+
         if es_result["success"] and es_snippet_result["success"]:
             logger.info(f"用户{index_name},对应的知识库{kb_name}, chunk: {chunk_id}, "
                         f"child_chunk_current_nums: {child_chunk_current_nums} 记录子分段删除成功")
