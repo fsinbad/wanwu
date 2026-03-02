@@ -5,6 +5,16 @@
         <img class="page-title-img" src="@/assets/imgs/model.svg" alt="" />
         <span class="page-title-name">{{ $t('modelAccess.title') }}</span>
       </div>-->
+      <div class="tabs" style="padding-top: 20px">
+        <div
+          v-for="item in tabList"
+          :key="item.type"
+          :class="['tab', { active: type === item.type }]"
+          @click="tabClick(item.type)"
+        >
+          {{ item.name }}
+        </div>
+      </div>
       <div class="table-box">
         <div class="table-form">
           <el-select
@@ -171,7 +181,10 @@
                     <i class="el-icon-more more"></i>
                   </span>
                   <el-dropdown-menu slot="dropdown">
-                    <el-dropdown-item :command="{ type: 'edit', item }">
+                    <el-dropdown-item
+                      v-if="item.allowEdit"
+                      :command="{ type: 'edit', item }"
+                    >
                       <i class="el-icon-edit-outline card-opera-icon"></i>
                       {{ $t('common.button.edit') }}
                     </el-dropdown-item>
@@ -261,6 +274,7 @@ import {
 } from './constants';
 import { avatarSrc } from '@/utils/util';
 import { LLM } from '@/views/modelAccess/constants';
+import { PROMPT } from '@/views/templateSquare/constants';
 
 export default {
   components: { Pagination, CreateSelectDialog, CreateDialog },
@@ -287,6 +301,14 @@ export default {
         { color: '#E87B00', backgroundColor: '#FFF3E5' },
         { color: '#0DA5A5', backgroundColor: '#E7F7F7' },
         { color: '#6349E8', backgroundColor: '#F1EDFF' },
+        { color: '#67C23A', backgroundColor: '#F0F9EB' },
+        { color: '#E6A23C', backgroundColor: '#FDF6EC' },
+      ],
+      type: '',
+      tabList: [
+        { name: this.$t('modelAccess.all'), type: '' },
+        { name: this.$t('modelAccess.public'), type: 'public' },
+        { name: this.$t('modelAccess.private'), type: 'private' },
       ],
     };
   },
@@ -297,26 +319,43 @@ export default {
       };
     },
   },
+  created() {
+    this.type = this.$route.query.type || '';
+  },
   mounted() {
     this.getTableData();
   },
   methods: {
     avatarSrc,
+    tabClick(type) {
+      this.type = type;
+      if (type === '') {
+        this.$router.replace({ query: {} });
+      } else {
+        this.$router.replace({ query: { type } });
+      }
+      this.clearParams();
+      this.getTableData();
+    },
     async getTableData(params) {
       this.loading = true;
       try {
-        const res = await fetchModelList({ ...params });
+        const res = await fetchModelList({ ...params, scopeType: this.type });
         const tableData = res.data ? res.data.list || [] : [];
         this.tableData = [...tableData];
       } finally {
         this.loading = false;
       }
     },
+    clearParams() {
+      this.params.provider = '';
+      this.params.modelType = '';
+      this.params.displayName = '';
+    },
     searchData(isCreate) {
       if (isCreate) {
-        this.params.provider = '';
-        this.params.modelType = '';
-        this.params.displayName = '';
+        this.clearParams();
+        this.type = '';
       }
       this.getTableData({ ...this.params });
     },
@@ -431,6 +470,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '@/style/tabs.scss';
 .routerview-container {
   top: 0;
 }

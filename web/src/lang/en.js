@@ -511,6 +511,9 @@ export default {
     support: '支持',
     noSupport: '不支持',
     noInferUrl: '暂无统一示例',
+    all: '全部',
+    public: '公有模型',
+    private: '个人模型',
     type: {
       yuanjing: '联通元景',
       qwen: '通义千问',
@@ -521,6 +524,10 @@ export default {
       asr: '语音识别模型',
     },
     table: {
+      scopeType: '公开范围',
+      all: '全局可见',
+      private: '仅自己可见',
+      org: '组织内可见',
       modelName: '模型名称',
       modelDisplayName: '模型显示名称',
       modelDesc: '模型描述',

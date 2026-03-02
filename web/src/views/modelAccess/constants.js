@@ -151,3 +151,12 @@ export const SUPPORT_FILE_TYPE_OBJ = {
   [IMAGE]: i18n.t('modelAccess.supportFileType.pic'),
   [VIDEO]: i18n.t('modelAccess.supportFileType.video'),
 };
+
+export const ALL = '2'; // 全局可见
+export const PRIVATE = '1'; // 仅自己可见
+export const ORG = '3'; // 组织内可见
+export const SCOPE_TYPE_LIST = [
+  { key: ALL, name: i18n.t('modelAccess.table.all') },
+  { key: PRIVATE, name: i18n.t('modelAccess.table.private') },
+  { key: ORG, name: i18n.t('modelAccess.table.org') },
+];
