@@ -513,7 +513,7 @@ export default {
     noInferUrl: '暂无统一示例',
     all: '全部',
     public: '公有模型',
-    private: '个人模型',
+    private: '我的模型',
     type: {
       yuanjing: '联通元景',
       qwen: '通义千问',
@@ -528,6 +528,7 @@ export default {
       all: '全局可见',
       private: '仅自己可见',
       org: '组织内可见',
+      model: '模型ID',
       modelName: '模型名称',
       modelDisplayName: '模型显示名称',
       modelDesc: '模型描述',

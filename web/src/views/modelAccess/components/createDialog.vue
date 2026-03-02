@@ -48,7 +48,7 @@
             {{ $t('modelAccess.table.embeddingTip') }}
           </div>
         </el-form-item>
-        <el-form-item :label="$t('modelAccess.table.modelName')" prop="model">
+        <el-form-item :label="$t('modelAccess.table.model')" prop="model">
           <el-input
             :disabled="isEdit"
             v-model="createForm.model"
@@ -299,7 +299,7 @@
             style="width: 100%"
           >
             <el-option
-              v-for="item in scopeTypeList"
+              v-for="item in getScopeTypeList()"
               :key="item.key"
               :label="item.name"
               :value="item.key"
@@ -353,12 +353,14 @@ import {
   YUAN_JING,
   QWEN,
   QIANFAN,
-  SCOPE_TYPE_LIST,
-  ALL,
   SUPPORT_FILE_TYPE_OBJ,
   IMAGE,
   VIDEO,
   HUOSHAN,
+  SCOPE_TYPE_LIST,
+  PRIVATE,
+  ORG,
+  ALL,
 } from '../constants';
 import LinkIcon from '@/components/linkIcon.vue';
 
@@ -376,6 +378,7 @@ export default {
       }
     };
     return {
+      isSystem: this.$store.state.user.permission.isSystem || false,
       allowEdit: true,
       defaultLogo: require('@/assets/imgs/model_default_icon.png'),
       dialogVisible: false,
@@ -384,7 +387,6 @@ export default {
       supportList: SUPPORT_LIST,
       supportFileTypeObj: SUPPORT_FILE_TYPE_OBJ,
       typeObj: TYPE_OBJ,
-      scopeTypeList: SCOPE_TYPE_LIST,
       llm: LLM,
       embedding: EMBEDDING,
       ollama: OLLAMA,
@@ -402,7 +404,7 @@ export default {
         model: '',
         displayName: '',
         endpointUrl: '',
-        scopeType: ALL,
+        scopeType: PRIVATE,
         apiKey: '',
         appKey: '',
         accessKey: '',
@@ -536,6 +538,12 @@ export default {
   },
   methods: {
     avatarSrc,
+    getScopeTypeList() {
+      // 系统管理员可设置的公开范围（个人、全局），普通用户可设置的公开范围（个人、组织内）
+      return this.isSystem
+        ? SCOPE_TYPE_LIST.filter(item => item.key !== ORG)
+        : SCOPE_TYPE_LIST.filter(item => item.key !== ALL);
+    },
     isMultiModal() {
       return [MULTIMODAL_RERANK, MULTIMODAL_EMBEDDING].includes(
         this.createForm.modelType,
@@ -632,7 +640,7 @@ export default {
         modelType: LLM,
         functionCalling: DEFAULT_CALLING,
         visionSupport: DEFAULT_SUPPORT,
-        scopeType: ALL,
+        scopeType: PRIVATE,
         contextSize: 8000,
         maxTokens: 4096,
         maxAsrFileSize: 10,

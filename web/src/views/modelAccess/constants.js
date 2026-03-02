@@ -152,11 +152,22 @@ export const SUPPORT_FILE_TYPE_OBJ = {
   [VIDEO]: i18n.t('modelAccess.supportFileType.video'),
 };
 
-export const ALL = '2'; // 全局可见
 export const PRIVATE = '1'; // 仅自己可见
+export const ALL = '2'; // 全局可见
 export const ORG = '3'; // 组织内可见
 export const SCOPE_TYPE_LIST = [
-  { key: ALL, name: i18n.t('modelAccess.table.all') },
   { key: PRIVATE, name: i18n.t('modelAccess.table.private') },
+  { key: ALL, name: i18n.t('modelAccess.table.all') },
   { key: ORG, name: i18n.t('modelAccess.table.org') },
 ];
+export const PUBLIC_MODEL = 'public';
+export const MINE_MODEL = 'private';
+export const TAB_LIST = [
+  { name: i18n.t('modelAccess.all'), type: '' },
+  { name: i18n.t('modelAccess.public'), type: PUBLIC_MODEL },
+  { name: i18n.t('modelAccess.private'), type: MINE_MODEL },
+];
+export const SCOPE_TYPE_OBJ = {
+  [PUBLIC_MODEL]: SCOPE_TYPE_LIST.filter(item => item.key !== PRIVATE),
+  [MINE_MODEL]: SCOPE_TYPE_LIST.filter(item => item.key !== ALL),
+};
