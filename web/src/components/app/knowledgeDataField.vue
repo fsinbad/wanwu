@@ -45,7 +45,9 @@
           class="action-item"
         >
           <div class="name">
-            <span>{{ item.name }}</span>
+            <span @click="handleKnowledgeLink(item.category, item.id)">
+              {{ item.name }}
+            </span>
           </div>
           <div class="bt">
             <el-tooltip
@@ -214,6 +216,17 @@ export default {
       if (!this.knowledgeConfig.knowledgebases.length) return;
       this.$refs.knowledgeRecallField.showDialog();
     },
+    // 跳转至知识库|问答库
+    handleKnowledgeLink(category, id) {
+      const targetRouterName =
+        category === 1
+          ? `/knowledge/qa/docList/${id}`
+          : `/knowledge/doclist/${id}`;
+      const routeData = this.$router.resolve({
+        name: targetRouterName,
+      });
+      window.open(routeData.location.name, '_blank');
+    },
   },
 };
 </script>
@@ -303,12 +316,13 @@ export default {
 
         .name {
           flex: 1;
-          color: #333;
+          color: $color;
           font-size: 14px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           margin-right: 12px;
+          cursor: pointer;
         }
 
         .bt {
