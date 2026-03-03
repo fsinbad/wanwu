@@ -22,7 +22,7 @@ func newAgent(ctx context.Context, cfg *config.Agent, query string, options opti
 	case config.AgentTypeReAct:
 		return newReactAgent(ctx, cfg, query, options)
 	case config.AgentTypeSandbox:
-		return newSandboxAgent(ctx, cfg, query, options)
+		return newSandboxAgentImpl(ctx, cfg, query, options)
 	case config.AgentTypeSequential:
 		return newSequentialAgent(ctx, cfg, query, options)
 	case config.AgentTypeLoop:

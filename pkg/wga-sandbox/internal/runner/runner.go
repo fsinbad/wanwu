@@ -17,6 +17,7 @@ type Runner interface {
 // RunRequest 运行请求参数。
 type RunRequest struct {
 	RunSession     wga_sandbox_option.RunSession
+	Sandbox        wga_sandbox_option.SandboxConfig
 	Instruction    string
 	OverallTask    string
 	CurrentTask    string
@@ -26,6 +27,5 @@ type RunRequest struct {
 	Skills         []wga_sandbox_option.Skill
 	Tools          []wga_sandbox_option.Tool
 	ModelConfig    wga_sandbox_option.ModelConfig
-	OutputFormat   wga_sandbox_option.OutputFormat
 	EnableThinking bool
 }

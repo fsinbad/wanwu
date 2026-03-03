@@ -1,8 +1,12 @@
 package sandbox
 
+import (
+	"context"
+)
+
 // 一次性容器模式沙箱实现（未完成）。
 //
-// 一次性模式为每次执行创建新的 Docker 容器，执行完成后销毁容器。
+// 一次性模式为每次执行创建新的容器，执行完成后销毁容器。
 //
 // 优点：
 //   - 完全隔离
@@ -18,31 +22,22 @@ package sandbox
 //   - Execute/ExecuteSync: 在容器内执行命令
 //   - CopyToSandbox/CopyFromSandbox: 文件复制
 
-import (
-	"context"
-)
-
-const (
-	defaultImageName            = "wga-sandbox-wanwu"
-	defaultImageTag             = "latest"
-	defaultOneshotWorkspaceBase = "/home/root/workspace"
-)
-
 var _ Sandbox = (*oneshotSandbox)(nil)
 
 type oneshotSandbox struct {
-	imageName     string
-	imageTag      string
-	workspaceBase string
-	uuid          string
+	imageName   string
+	imageTag    string
+	apiEndpoint string
+	uuid        string
 }
 
-func newOneshotSandbox(uuid string) Sandbox {
+func newOneshotSandbox(imageName, apiEndpoint, uuid string) Sandbox {
+	imageName, imageTag := parseImageName(imageName)
 	return &oneshotSandbox{
-		imageName:     defaultImageName,
-		imageTag:      defaultImageTag,
-		workspaceBase: defaultOneshotWorkspaceBase,
-		uuid:          uuid,
+		imageName:   imageName,
+		imageTag:    imageTag,
+		apiEndpoint: apiEndpoint,
+		uuid:        uuid,
 	}
 }
 
@@ -68,4 +63,35 @@ func (s *oneshotSandbox) CopyToSandbox(ctx context.Context, localPath string, de
 
 func (s *oneshotSandbox) CopyFromSandbox(ctx context.Context, localPath string) error {
 	panic("not implemented: oneshotSandbox.CopyFromSandbox")
+}
+
+func (s *oneshotSandbox) WorkDir() string {
+	panic("not implemented: oneshotSandbox.WorkDir")
+}
+
+func (s *oneshotSandbox) UUID() string {
+	panic("not implemented: oneshotSandbox.UUID")
+}
+
+func parseImageName(name string) (imageName, imageTag string) {
+	parts := splitImageName(name)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return name, "latest"
+}
+
+func splitImageName(name string) []string {
+	var result []string
+	var current string
+	for _, c := range name {
+		if c == ':' {
+			result = append(result, current)
+			current = ""
+		} else {
+			current += string(c)
+		}
+	}
+	result = append(result, current)
+	return result
 }

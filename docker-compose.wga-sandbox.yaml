@@ -9,6 +9,7 @@ services:
     networks:
       - ${WANWU_DOCKER_NETWORK}
     ports:
+      - 4096:4096
       - 8080:8080
     # volumes:
     #   - ./configs/microservice/bff-service/configs/agent-skills:/home/root/.claude/skills

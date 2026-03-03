@@ -14,12 +14,12 @@ import (
 	wga_sandbox_option "github.com/UnicomAI/wanwu/pkg/wga-sandbox/wga-sandbox-option"
 )
 
+var manager = sandbox.NewManager()
+
 type jsonErrorEvent struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }
-
-var manager = sandbox.NewManager()
 
 // Run 在沙箱容器中执行智能体任务。
 func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string, error) {
@@ -29,7 +29,7 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 	}
 
 	runID := opt.RunSession.RunID
-	if err := manager.Create(ctx, runID, opt.SandboxType); err != nil {
+	if err := manager.Create(ctx, runID, opt.Sandbox); err != nil {
 		return nil, fmt.Errorf("create sandbox failed: %w", err)
 	}
 
@@ -42,6 +42,7 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 
 	req := runner.RunRequest{
 		RunSession:     opt.RunSession,
+		Sandbox:        opt.Sandbox,
 		Instruction:    opt.Instruction,
 		OverallTask:    opt.OverallTask,
 		CurrentTask:    opt.CurrentTask,
@@ -51,7 +52,6 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 		Skills:         opt.Skills,
 		Tools:          opt.Tools,
 		ModelConfig:    opt.ModelConfig,
-		OutputFormat:   opt.OutputFormat,
 		EnableThinking: opt.EnableThinking,
 	}
 
@@ -67,13 +67,13 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 		defer util.PrintPanicStack()
 		defer close(outputCh)
 		if !opt.SkipCleanup {
-			defer func() { manager.Cleanup(ctx, runID) }()
+			defer func() { _ = manager.Cleanup(ctx, runID) }()
 		}
 
 		log.Infof("%s preparing...", logPrefix)
 		if err := r.BeforeRun(ctx); err != nil {
 			log.Errorf("%s prepare failed: %v", logPrefix, err)
-			sendErrorEvent(outputCh, opt.OutputFormat, fmt.Sprintf("prepare failed: %v", err))
+			sendErrorEvent(outputCh, fmt.Sprintf("prepare failed: %v", err))
 			return
 		}
 
@@ -81,7 +81,7 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 		runnerOutputCh, err := r.Run(ctx)
 		if err != nil {
 			log.Errorf("%s run failed: %v", logPrefix, err)
-			sendErrorEvent(outputCh, opt.OutputFormat, fmt.Sprintf("run failed: %v", err))
+			sendErrorEvent(outputCh, fmt.Sprintf("run failed: %v", err))
 			return
 		}
 
@@ -96,7 +96,7 @@ func Run(ctx context.Context, opts ...wga_sandbox_option.Option) (<-chan string,
 		log.Infof("%s finishing...", logPrefix)
 		if err := r.AfterRun(ctx); err != nil {
 			log.Errorf("%s finish failed: %v", logPrefix, err)
-			sendErrorEvent(outputCh, opt.OutputFormat, fmt.Sprintf("finish failed: %v", err))
+			sendErrorEvent(outputCh, fmt.Sprintf("finish failed: %v", err))
 			return
 		}
 		if opt.OutputDir != "" {
@@ -112,21 +112,14 @@ func Cleanup(ctx context.Context, runID string) error {
 	return manager.Cleanup(ctx, runID)
 }
 
-func sendErrorEvent(ch chan<- string, format wga_sandbox_option.OutputFormat, message string) {
-	var event string
-	switch format {
-	case wga_sandbox_option.OutputFormatJSON:
-		evt := jsonErrorEvent{Type: "error", Message: message}
-		if data, err := json.Marshal(evt); err == nil {
-			event = string(data)
-		} else {
-			event = fmt.Sprintf(`{"type":"error","message":"%s"}`, message)
-		}
-	default:
-		event = fmt.Sprintf("[ERROR] %s", message)
+func sendErrorEvent(ch chan<- string, message string) {
+	evt := jsonErrorEvent{Type: "error", Message: message}
+	data, err := json.Marshal(evt)
+	if err != nil {
+		data = []byte(fmt.Sprintf(`{"type":"error","message":"%s"}`, message))
 	}
 	select {
-	case ch <- event:
+	case ch <- string(data):
 	default:
 	}
 }

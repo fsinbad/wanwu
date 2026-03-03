@@ -5,16 +5,15 @@ import (
 
 	openapi3_util "github.com/UnicomAI/wanwu/pkg/openapi3-util"
 	"github.com/UnicomAI/wanwu/pkg/wga/internal/config"
-	wga_option "github.com/UnicomAI/wanwu/pkg/wga/wga-option"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/compose"
 )
 
-func (options *Options) checkToolsCondition(toolCategories []*config.ToolCategory) ([]wga_option.CheckToolCategory, error) {
-	var rets []wga_option.CheckToolCategory
+func (options *Options) checkToolsCondition(toolCategories []*config.ToolCategory) ([]CheckToolCategory, error) {
+	var rets []CheckToolCategory
 	for _, toolCategory := range toolCategories {
 		// category tools
-		var retTools []wga_option.CheckTool
+		var retTools []CheckTool
 		for _, toolCfg := range toolCategory.Tools {
 			if !toolCfg.AuthRequired {
 				// 无需配置的tool，不加入该category的检查结果
@@ -31,7 +30,7 @@ func (options *Options) checkToolsCondition(toolCategories []*config.ToolCategor
 				toolMeet = true
 				break
 			}
-			retTools = append(retTools, wga_option.CheckTool{
+			retTools = append(retTools, CheckTool{
 				Title: toolCfg.Doc.Info.Title,
 				Meet:  toolMeet,
 			})
@@ -64,7 +63,7 @@ func (options *Options) checkToolsCondition(toolCategories []*config.ToolCategor
 		default:
 			return nil, fmt.Errorf("tool category (%v) condition (%v) unknown", toolCategory.Category, toolCategory.Condition)
 		}
-		rets = append(rets, wga_option.CheckToolCategory{
+		rets = append(rets, CheckToolCategory{
 			Category:  string(toolCategory.Category),
 			Condition: string(toolCategory.Condition),
 			Meet:      categoryMeet,

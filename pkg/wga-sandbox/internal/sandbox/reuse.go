@@ -1,8 +1,19 @@
+// Package sandbox 提供沙箱环境接口。
 package sandbox
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/UnicomAI/wanwu/pkg/util"
+)
 
 // 复用容器模式沙箱实现。
 //
-// 复用模式使用预运行的 Docker 容器（默认：wga-sandbox-wanwu），
+// 复用模式使用预运行的容器，通过 HTTP API 进行交互，
 // 每次执行在容器内创建独立的工作目录，执行完成后清理工作目录。
 //
 // 优点：
@@ -13,146 +24,225 @@ package sandbox
 //   - 开发环境
 //   - 频繁执行的场景
 
-import (
-	"bufio"
-	"context"
-	"fmt"
-	"os/exec"
-	"sync"
-
-	"github.com/UnicomAI/wanwu/pkg/util"
-)
-
-const (
-	defaultContainerName = "wga-sandbox-wanwu"
-	defaultWorkspaceBase = "/home/root/workspace"
-)
-
 var _ Sandbox = (*reuseSandbox)(nil)
 
 type reuseSandbox struct {
-	containerName string
-	workspaceBase string
-	uuid          string
-	workDir       string
+	client  *client
+	uuid    string
+	workDir string
 }
 
-func newReuseSandbox(uuid string) Sandbox {
+func newReuseSandbox(apiEndpoint, uuid string) Sandbox {
 	return &reuseSandbox{
-		containerName: defaultContainerName,
-		workspaceBase: defaultWorkspaceBase,
-		uuid:          uuid,
+		client: newClient(apiEndpoint),
+		uuid:   uuid,
 	}
 }
 
 func (s *reuseSandbox) Prepare(ctx context.Context) error {
-	s.workDir = fmt.Sprintf("%s/%s/workspace", s.workspaceBase, s.uuid)
-	cmd := exec.CommandContext(ctx, "docker", "exec", s.containerName, "mkdir", "-p", s.workDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create workspace: %w, output: %s", err, string(output))
+	s.workDir = filepath.Join(workspaceBase, s.uuid, "workspace")
+	_, err := s.client.exec(ctx, "mkdir -p "+s.workDir, "/")
+	if err != nil {
+		return fmt.Errorf("failed to create workspace: %w", err)
 	}
 	return nil
 }
 
 func (s *reuseSandbox) Cleanup(ctx context.Context) error {
-	workspacePath := fmt.Sprintf("%s/%s", s.workspaceBase, s.uuid)
-	cmd := exec.CommandContext(ctx, "docker", "exec", s.containerName, "rm", "-rf", workspacePath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to cleanup workspace: %w, output: %s", err, string(output))
+	workspacePath := filepath.Join(workspaceBase, s.uuid)
+	_, err := s.client.exec(ctx, "rm -rf "+workspacePath, "/")
+	if err != nil {
+		return fmt.Errorf("failed to cleanup workspace: %w", err)
 	}
 	return nil
 }
 
 func (s *reuseSandbox) Execute(ctx context.Context, args ...string) (<-chan string, error) {
+	cmd := strings.Join(args, " ")
 	outputCh := make(chan string, 1024)
-
-	execArgs := append([]string{"exec", "-w", s.workDir, s.containerName}, args...)
-	cmd := exec.CommandContext(ctx, "docker", execArgs...)
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start command: %w", err)
-	}
 
 	go func() {
 		defer util.PrintPanicStack()
 		defer close(outputCh)
 
-		var wg sync.WaitGroup
-
-		wg.Add(1)
-		go func() {
-			defer util.PrintPanicStack()
-			defer wg.Done()
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				select {
-				case outputCh <- scanner.Text():
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer util.PrintPanicStack()
-			defer wg.Done()
-			scanner := bufio.NewScanner(stderr)
-			for scanner.Scan() {
-				select {
-				case outputCh <- fmt.Sprintf("[STDERR] %s", scanner.Text()):
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		if err := cmd.Wait(); err != nil {
+		err := s.client.execWithOutput(ctx, cmd, s.workDir, outputCh)
+		if err != nil {
 			select {
 			case outputCh <- fmt.Sprintf("[ERROR] command execution failed: %v", err):
 			case <-ctx.Done():
 			}
 		}
-
-		wg.Wait()
 	}()
 
 	return outputCh, nil
 }
 
 func (s *reuseSandbox) ExecuteSync(ctx context.Context, args ...string) (string, error) {
-	execArgs := append([]string{"exec", "-w", s.workDir, s.containerName}, args...)
-	cmd := exec.CommandContext(ctx, "docker", execArgs...)
-	output, err := cmd.CombinedOutput()
-	return string(output), err
+	cmd := strings.Join(args, " ")
+	result, err := s.client.exec(ctx, cmd, s.workDir)
+	if err != nil {
+		return "", err
+	}
+	return result.Output, nil
 }
 
-func (s *reuseSandbox) CopyToSandbox(ctx context.Context, localPath string, destPath ...string) error {
-	target := s.workDir
-	if len(destPath) > 0 {
-		target = s.workDir + "/" + destPath[0]
+// CopyToSandbox 将本地文件或目录复制到沙箱。
+// localPath: 本地文件或目录路径
+// relativePath: 可选，相对于 workDir 的目标路径，为空则使用 workDir
+func (s *reuseSandbox) CopyToSandbox(ctx context.Context, localPath string, relativePath ...string) error {
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat local path: %w", err)
 	}
-	cmd := exec.CommandContext(ctx, "docker", "cp", localPath, s.containerName+":"+target)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to copy to sandbox: %w, output: %s", err, string(output))
+
+	sandboxPath := s.workDir
+	if len(relativePath) > 0 {
+		sandboxPath = filepath.Join(s.workDir, relativePath[0])
 	}
-	return nil
+
+	if info.IsDir() {
+		return s.copyDirToSandbox(ctx, localPath, sandboxPath)
+	}
+	return s.copyFileToSandbox(ctx, localPath, sandboxPath)
 }
 
+// CopyFromSandbox 将沙箱的 workDir 复制到本地。
+// localPath: 本地目标路径
 func (s *reuseSandbox) CopyFromSandbox(ctx context.Context, localPath string) error {
-	cmd := exec.CommandContext(ctx, "docker", "cp", s.containerName+":"+s.workDir+"/.", localPath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to copy from sandbox: %w, output: %s", err, string(output))
+	info, err := s.getSandboxInfo(ctx, s.workDir)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox info: %w", err)
 	}
+
+	if info.isDir {
+		return s.copyDirFromSandbox(ctx, localPath)
+	}
+	return s.copyFileFromSandbox(ctx, s.workDir, localPath)
+}
+
+func (s *reuseSandbox) WorkDir() string {
+	return s.workDir
+}
+
+func (s *reuseSandbox) UUID() string {
+	return s.uuid
+}
+
+// copyDirToSandbox 将本地目录复制到沙箱。
+// 如果目录为空，跳过复制。
+func (s *reuseSandbox) copyDirToSandbox(ctx context.Context, localDir, sandboxPath string) error {
+	if isDirEmpty(localDir) {
+		return nil
+	}
+
+	tarData, err := util.TarDir(localDir)
+	if err != nil {
+		return fmt.Errorf("failed to tar directory: %w", err)
+	}
+
+	tarName := filepath.Base(localDir) + ".tar"
+	tarPath := filepath.Join(s.workDir, tarName)
+
+	if err := s.client.uploadData(ctx, tarData, tarPath); err != nil {
+		return fmt.Errorf("failed to upload tar: %w", err)
+	}
+	defer func() { _ = s.client.delete(ctx, tarPath) }()
+
+	if _, err := s.client.exec(ctx, "mkdir -p "+sandboxPath, "/"); err != nil {
+		return fmt.Errorf("failed to create remote directory: %w", err)
+	}
+
+	cmd := fmt.Sprintf("cd %s && tar -xzf %s && rm %s", sandboxPath, tarPath, tarPath)
+	if _, err := s.client.exec(ctx, cmd, s.workDir); err != nil {
+		return fmt.Errorf("failed to extract tar: %w", err)
+	}
+
 	return nil
+}
+
+func (s *reuseSandbox) copyFileToSandbox(ctx context.Context, localFile, sandboxPath string) error {
+	return s.client.upload(ctx, localFile, sandboxPath)
+}
+
+// copyDirFromSandbox 将沙箱的 workDir 复制到本地目录。
+// 如果目录为空或只包含隐藏文件，跳过复制。
+func (s *reuseSandbox) copyDirFromSandbox(ctx context.Context, localPath string) error {
+	onlyHidden, err := s.hasOnlyHiddenFiles(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check sandbox dir: %w", err)
+	}
+	if onlyHidden {
+		return nil
+	}
+
+	tarName := filepath.Base(s.workDir) + ".tar"
+	tarPath := filepath.Join(filepath.Dir(s.workDir), tarName)
+
+	cmd := fmt.Sprintf("cd %s && tar -czf %s %s", filepath.Dir(s.workDir), tarName, filepath.Base(s.workDir))
+	if _, err := s.client.exec(ctx, cmd, "/"); err != nil {
+		return fmt.Errorf("failed to create tar: %w", err)
+	}
+	defer func() { _ = s.client.delete(ctx, tarPath) }()
+
+	tarData, err := s.client.downloadData(ctx, tarPath)
+	if err != nil {
+		return fmt.Errorf("failed to download tar: %w", err)
+	}
+
+	if err := os.MkdirAll(localPath, 0755); err != nil {
+		return fmt.Errorf("failed to create local directory: %w", err)
+	}
+
+	if err := util.Untar(tarData, localPath); err != nil {
+		return fmt.Errorf("failed to extract tar: %w", err)
+	}
+
+	return nil
+}
+
+func (s *reuseSandbox) copyFileFromSandbox(ctx context.Context, sandboxPath, localPath string) error {
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return fmt.Errorf("failed to create local directory: %w", err)
+	}
+	return s.client.download(ctx, sandboxPath, localPath)
+}
+
+type sandboxInfo struct {
+	isDir bool
+	name  string
+}
+
+func (s *reuseSandbox) getSandboxInfo(ctx context.Context, sandboxPath string) (*sandboxInfo, error) {
+	cmd := fmt.Sprintf("if [ -d %s ]; then echo DIR; elif [ -f %s ]; then echo FILE; else echo NOTFOUND; fi", sandboxPath, sandboxPath)
+	result, err := s.client.exec(ctx, cmd, "/")
+	if err != nil {
+		return nil, err
+	}
+	output := strings.TrimSpace(result.Output)
+	if output == "NOTFOUND" {
+		return nil, fmt.Errorf("sandbox path not found: %s", sandboxPath)
+	}
+	return &sandboxInfo{
+		isDir: output == "DIR",
+		name:  filepath.Base(sandboxPath),
+	}, nil
+}
+
+// hasOnlyHiddenFiles 检查沙箱目录是否为空或只包含隐藏文件/目录。
+func (s *reuseSandbox) hasOnlyHiddenFiles(ctx context.Context) (bool, error) {
+	cmd := fmt.Sprintf("ls -A %s | grep -v '^[.]' || true", s.workDir)
+	result, err := s.client.exec(ctx, cmd, "/")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(result.Output) == "", nil
+}
+
+// isDirEmpty 检查本地目录是否为空。
+func isDirEmpty(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	return len(entries) == 0
 }

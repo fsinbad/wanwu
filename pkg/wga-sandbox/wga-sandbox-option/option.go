@@ -11,6 +11,28 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// ============================================================================
+// 常量
+// ============================================================================
+
+const (
+	SandboxTypeReuse   SandboxType = "reuse"   // 复用容器模式
+	SandboxTypeOneshot SandboxType = "oneshot" // 一次性容器模式
+)
+
+const (
+	RunnerTypeOpencode RunnerType = "opencode" // opencode 智能体（默认）
+)
+
+const (
+	sandboxAPIPort  = 8080 // sandbox API 端口
+	opencodeAPIPort = 4096 // opencode API 端口
+)
+
+// ============================================================================
+// 类型 - 配置
+// ============================================================================
+
 // ModelConfig 模型配置。
 type ModelConfig struct {
 	Provider     string // 提供商标识
@@ -40,39 +62,59 @@ type Skill struct {
 	Dir string // skill 目录路径
 }
 
-// SandboxType 沙箱类型。
-type SandboxType string
-
-const (
-	SandboxTypeReuse   SandboxType = "reuse"   // 复用容器模式（默认）
-	SandboxTypeOneshot SandboxType = "oneshot" // 一次性容器模式
-)
-
-// RunnerType 运行器类型。
-type RunnerType string
-
-const (
-	RunnerTypeOpencode RunnerType = "opencode" // opencode 智能体（默认）
-)
-
-// OutputFormat 输出格式。
-type OutputFormat string
-
-const (
-	OutputFormatText OutputFormat = "text" // 文本格式（默认）
-	OutputFormatJSON OutputFormat = "json" // JSON 事件流格式
-)
-
 // RunSession 执行会话标识。
 type RunSession struct {
 	ThreadID string // 对话会话 ID
 	RunID    string // 执行请求 ID
 }
 
+// SandboxType 沙箱类型。
+type SandboxType string
+
+// RunnerType 运行器类型。
+type RunnerType string
+
+// ============================================================================
+// 类型 - SandboxConfig
+// ============================================================================
+
+// SandboxConfig 沙箱配置。
+type SandboxConfig struct {
+	sandboxType SandboxType
+	host        string // localhost 或容器名
+	imageName   string // oneshot 模式用
+}
+
+func (c SandboxConfig) Type() SandboxType {
+	return c.sandboxType
+}
+
+func (c SandboxConfig) Host() string {
+	return c.host
+}
+
+func (c SandboxConfig) ImageName() string {
+	return c.imageName
+}
+
+func (c SandboxConfig) APIEndpoint() string {
+	return fmt.Sprintf("http://%s:%d", c.host, sandboxAPIPort)
+}
+
+func (c SandboxConfig) OpencodeEndpoint() string {
+	return fmt.Sprintf("http://%s:%d", c.host, opencodeAPIPort)
+}
+
+// ============================================================================
+// 类型 - Option/RunOption
+// ============================================================================
+
+// Option 选项接口。
 type Option interface {
 	apply(*RunOption) error
 }
 
+// OptionFunc 选项函数。
 type OptionFunc func(*RunOption) error
 
 func (f OptionFunc) apply(opts *RunOption) error {
@@ -83,6 +125,8 @@ func (f OptionFunc) apply(opts *RunOption) error {
 type RunOption struct {
 	RunSession     RunSession
 	ModelConfig    ModelConfig
+	Sandbox        SandboxConfig
+	RunnerType     RunnerType
 	Instruction    string
 	OverallTask    string
 	CurrentTask    string
@@ -91,9 +135,6 @@ type RunOption struct {
 	Messages       []Message
 	Skills         []Skill
 	Tools          []Tool
-	SandboxType    SandboxType
-	RunnerType     RunnerType
-	OutputFormat   OutputFormat
 	EnableThinking bool
 	SkipCleanup    bool
 	AgentName      string
@@ -111,10 +152,42 @@ func (o *RunOption) Apply(opts ...Option) error {
 	if o.RunSession.RunID == "" {
 		o.RunSession.RunID = uuid.New().String()
 	}
+	if o.Sandbox.Type() == "" {
+		o.Sandbox.sandboxType = SandboxTypeReuse
+	}
+	if o.Sandbox.Host() == "" {
+		return fmt.Errorf("sandbox requires host")
+	}
+	if o.Sandbox.Type() == SandboxTypeOneshot && o.Sandbox.ImageName() == "" {
+		return fmt.Errorf("oneshot sandbox requires image name")
+	}
 	return nil
 }
 
-// WithModelConfig 设置模型配置（必须）。
+// ============================================================================
+// 构造函数
+// ============================================================================
+
+// SandboxReuse 创建复用容器模式的沙箱配置。
+func SandboxReuse(host string) SandboxConfig {
+	return SandboxConfig{
+		sandboxType: SandboxTypeReuse,
+		host:        host,
+	}
+}
+
+// SandboxOneshot 创建一次性容器模式的沙箱配置。
+func SandboxOneshot(imageName string) SandboxConfig {
+	return SandboxConfig{
+		sandboxType: SandboxTypeOneshot,
+		imageName:   imageName,
+	}
+}
+
+// ============================================================================
+// 选项函数
+// ============================================================================
+
 func WithModelConfig(config ModelConfig) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.ModelConfig = config
@@ -122,7 +195,6 @@ func WithModelConfig(config ModelConfig) Option {
 	})
 }
 
-// WithRunSession 设置执行会话标识。
 func WithRunSession(session RunSession) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.RunSession = session
@@ -130,7 +202,20 @@ func WithRunSession(session RunSession) Option {
 	})
 }
 
-// WithInstruction 设置系统提示词。
+func WithSandbox(cfg SandboxConfig) Option {
+	return OptionFunc(func(opts *RunOption) error {
+		opts.Sandbox = cfg
+		return nil
+	})
+}
+
+func WithRunnerType(runnerType RunnerType) Option {
+	return OptionFunc(func(opts *RunOption) error {
+		opts.RunnerType = runnerType
+		return nil
+	})
+}
+
 func WithInstruction(instruction string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.Instruction = instruction
@@ -138,7 +223,6 @@ func WithInstruction(instruction string) Option {
 	})
 }
 
-// WithOverallTask 设置整体任务（用于多智能体场景）。
 func WithOverallTask(overallTask string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.OverallTask = overallTask
@@ -146,7 +230,6 @@ func WithOverallTask(overallTask string) Option {
 	})
 }
 
-// WithCurrentTask 设置当前任务。
 func WithCurrentTask(currentTask string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.CurrentTask = currentTask
@@ -154,7 +237,6 @@ func WithCurrentTask(currentTask string) Option {
 	})
 }
 
-// WithInputDir 设置输入目录。
 func WithInputDir(inputDir string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.InputDir = inputDir
@@ -162,7 +244,6 @@ func WithInputDir(inputDir string) Option {
 	})
 }
 
-// WithOutputDir 设置输出目录。
 func WithOutputDir(outputDir string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.OutputDir = outputDir
@@ -170,7 +251,6 @@ func WithOutputDir(outputDir string) Option {
 	})
 }
 
-// WithMessages 设置历史消息列表。
 func WithMessages(messages []Message) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.Messages = messages
@@ -178,7 +258,6 @@ func WithMessages(messages []Message) Option {
 	})
 }
 
-// WithSkills 设置技能列表。
 func WithSkills(skills []Skill) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.Skills = skills
@@ -186,7 +265,6 @@ func WithSkills(skills []Skill) Option {
 	})
 }
 
-// WithTools 设置工具列表。
 func WithTools(tools []Tool) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		ctx := context.Background()
@@ -212,31 +290,6 @@ func WithTools(tools []Tool) Option {
 	})
 }
 
-// WithSandboxType 设置沙箱类型。
-func WithSandboxType(sandboxType SandboxType) Option {
-	return OptionFunc(func(opts *RunOption) error {
-		opts.SandboxType = sandboxType
-		return nil
-	})
-}
-
-// WithRunnerType 设置运行器类型。
-func WithRunnerType(runnerType RunnerType) Option {
-	return OptionFunc(func(opts *RunOption) error {
-		opts.RunnerType = runnerType
-		return nil
-	})
-}
-
-// WithOutputFormat 设置输出格式。
-func WithOutputFormat(format OutputFormat) Option {
-	return OptionFunc(func(opts *RunOption) error {
-		opts.OutputFormat = format
-		return nil
-	})
-}
-
-// WithEnableThinking 启用思考模式。
 func WithEnableThinking(enable bool) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.EnableThinking = enable
@@ -244,7 +297,6 @@ func WithEnableThinking(enable bool) Option {
 	})
 }
 
-// WithSkipCleanup 跳过沙箱清理。
 func WithSkipCleanup(skip bool) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.SkipCleanup = skip
@@ -252,7 +304,6 @@ func WithSkipCleanup(skip bool) Option {
 	})
 }
 
-// WithAgentName 设置智能体名称（用于日志标识）。
 func WithAgentName(name string) Option {
 	return OptionFunc(func(opts *RunOption) error {
 		opts.AgentName = name

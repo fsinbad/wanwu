@@ -31,15 +31,14 @@ func NewManager() *Manager {
 
 // Create 创建并初始化沙箱。
 //
-// 根据 sandboxType 创建对应的沙箱实例（reuse 或 oneshot），
+// 根据 sandboxConfig 创建对应的沙箱实例（reuse 或 oneshot），
 // 调用 Prepare 初始化工作目录，并注册到管理器中。
-func (m *Manager) Create(ctx context.Context, runID string, sandboxType wga_sandbox_option.SandboxType) error {
+func (m *Manager) Create(ctx context.Context, runID string, cfg wga_sandbox_option.SandboxConfig) error {
 	var sb Sandbox
-	switch sandboxType {
-	case wga_sandbox_option.SandboxTypeOneshot:
-		sb = newOneshotSandbox(runID)
-	default:
-		sb = newReuseSandbox(runID)
+	if cfg.Type() == wga_sandbox_option.SandboxTypeOneshot {
+		sb = newOneshotSandbox(cfg.ImageName(), cfg.APIEndpoint(), runID)
+	} else {
+		sb = newReuseSandbox(cfg.APIEndpoint(), runID)
 	}
 
 	if err := sb.Prepare(ctx); err != nil {

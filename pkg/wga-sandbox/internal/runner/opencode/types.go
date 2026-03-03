@@ -1,28 +1,21 @@
-// Package opencode 提供 opencode 智能体的运行器实现
 package opencode
 
 import "encoding/json"
 
-// OpencodeEventType opencode 输出事件类型
-//
-// opencode 使用 JSON Lines 格式输出事件流，每个事件包含 type 字段标识类型。
-// 目前处理的事件类型：
-//   - text: 文本输出
-//   - tool_use: 工具调用
-//   - reasoning: 推理/思考过程
-//
-// 忽略的事件类型：
-//   - step_start, step_finish: 步骤开始/结束
-//   - snapshot, patch: 状态快照/补丁
-//   - file, agent, retry, subtask, compaction: 其他事件
+// ============================================================================
+// Opencode 输出类型（导出）
+// ============================================================================
+
+// OpencodeEventType 事件类型。
 type OpencodeEventType string
 
+// 事件类型常量。
 const (
 	OpencodeEventTypeStepStart  OpencodeEventType = "step_start"
 	OpencodeEventTypeStepFinish OpencodeEventType = "step_finish"
-	OpencodeEventTypeText       OpencodeEventType = "text"      // 文本输出
-	OpencodeEventTypeToolUse    OpencodeEventType = "tool_use"  // 工具调用
-	OpencodeEventTypeReasoning  OpencodeEventType = "reasoning" // 推理/思考过程
+	OpencodeEventTypeText       OpencodeEventType = "text"
+	OpencodeEventTypeToolUse    OpencodeEventType = "tool_use"
+	OpencodeEventTypeReasoning  OpencodeEventType = "reasoning"
 	OpencodeEventTypeSnapshot   OpencodeEventType = "snapshot"
 	OpencodeEventTypePatch      OpencodeEventType = "patch"
 	OpencodeEventTypeFile       OpencodeEventType = "file"
@@ -32,15 +25,91 @@ const (
 	OpencodeEventTypeCompaction OpencodeEventType = "compaction"
 )
 
-// OpencodeEvent opencode 输出事件结构
-//
-// opencode 使用 JSON Lines 格式，每行一个事件：
-//
-//	{"type":"text","timestamp":1234567890,"sessionID":"xxx","part":{"text":"Hello"}}
-//	{"type":"tool_use","timestamp":1234567891,"sessionID":"xxx","part":{"tool":"bash","state":{...}}}
+// OpencodeEvent 输出事件结构。
 type OpencodeEvent struct {
-	Type      OpencodeEventType `json:"type"`      // 事件类型
-	Timestamp int64             `json:"timestamp"` // 时间戳（毫秒）
-	SessionID string            `json:"sessionID"` // 会话 ID
-	Part      json.RawMessage   `json:"part"`      // 事件内容，具体结构取决于 Type
+	Type      OpencodeEventType `json:"type"`
+	Timestamp int64             `json:"timestamp"`
+	SessionID string            `json:"sessionID"`
+	Part      json.RawMessage   `json:"part"`
+}
+
+// ============================================================================
+// 事件部分类型
+// ============================================================================
+
+// textPart 文本部分。
+type textPart struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// reasoningPart 推理部分。
+type reasoningPart struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// toolPart 工具调用部分。
+type toolPart struct {
+	Type   string    `json:"type"`
+	CallID string    `json:"callID,omitempty"`
+	Tool   string    `json:"tool"`
+	State  toolState `json:"state"`
+}
+
+// toolState 工具调用状态。
+type toolState struct {
+	Status string      `json:"status"`
+	Input  interface{} `json:"input,omitempty"`
+	Output string      `json:"output,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
+
+// ============================================================================
+// SSE 事件类型（内部使用）
+// ============================================================================
+
+// sseEvent SSE 事件结构。
+type sseEvent struct {
+	Directory string          `json:"directory"`
+	Payload   sseEventPayload `json:"payload"`
+}
+
+// sseEventPayload SSE 事件负载。
+type sseEventPayload struct {
+	Type       string        `json:"type"`
+	Properties sseEventProps `json:"properties"`
+}
+
+// sseEventProps SSE 事件属性。
+type sseEventProps struct {
+	SessionID string         `json:"sessionID"`
+	Part      sseEventPart   `json:"part"`
+	Delta     string         `json:"delta"`
+	Status    sseEventStatus `json:"status"`
+}
+
+// sseEventPart SSE 事件部分。
+type sseEventPart struct {
+	ID        string       `json:"id"`
+	SessionID string       `json:"sessionID"`
+	MessageID string       `json:"messageID"`
+	Type      string       `json:"type"`
+	Text      string       `json:"text"`
+	CallID    string       `json:"callID"`
+	Tool      string       `json:"tool"`
+	State     sseToolState `json:"state"`
+}
+
+// sseToolState 工具调用状态。
+type sseToolState struct {
+	Status string      `json:"status"`
+	Input  interface{} `json:"input,omitempty"`
+	Output string      `json:"output,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
+
+// sseEventStatus SSE 事件状态。
+type sseEventStatus struct {
+	Type string `json:"type"`
 }
