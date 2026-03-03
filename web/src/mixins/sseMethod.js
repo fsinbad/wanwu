@@ -41,7 +41,6 @@ export default {
       sseApi: AGENT_API_URL,
       rag_sseApi: RAG_API_URL,
       exprience_sseApi: EXPRIENCE_API_URL,
-      token: store.getters['user/token'],
       lastIndex: 0,
       query: '',
       isStoped: false,
@@ -73,6 +72,7 @@ export default {
   },
   computed: {
     ...mapGetters('app', ['sessionStatus']),
+    ...mapGetters('user', ['token', 'userInfo']),
   },
   methods: {
     ...mapActions('app', ['setStoreSessionStatus']),
@@ -144,7 +144,7 @@ export default {
           return response;
         })
         .catch(err => {
-          this.$message.warning('连接失败，请稍后重试');
+          this.$message.warning(i18n.t('sse.connectError'));
           this.isEnd = true;
           this.setStoreSessionStatus(-1);
           this.runDisabled = false;
@@ -212,6 +212,49 @@ export default {
         this.sessionComRef = data.sessionComRef;
       }
     },
+    fetchEventSource(url, params, options = {}) {
+      const {
+        onopen,
+        onmessage,
+        onclose = () => {
+          console.log('===> eventSource onClose');
+          this.setStoreSessionStatus(-1); //关闭后改变状态
+          this.sseOnCloseCallBack();
+        },
+        onerror = e => {
+          console.log(i18n.t('sse.connectError'));
+          if (e.readyState === EventSource.CLOSED) {
+            console.log('connection is closed');
+          } else {
+            console.warn('Error occured', e);
+          }
+          this.stopEventSource(); //前端主动关闭连接
+          this.setStoreSessionStatus(-1); //关闭后改变状态
+        },
+        headers,
+        ...rest
+      } = options;
+      this.ctrlAbort = new AbortController();
+      return new fetchEventSource(this.origin + url, {
+        method: 'POST',
+        headers: headers
+          ? headers
+          : {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + this.token,
+              'x-user-id': this.userInfo.uid,
+              'x-org-id': this.userInfo.orgId,
+            },
+        signal: this.ctrlAbort.signal,
+        body: JSON.stringify(params),
+        openWhenHidden: true,
+        onopen: onopen,
+        onmessage: onmessage,
+        onclose: onclose,
+        onerror: onerror,
+        rest,
+      });
+    },
     doragSend() {
       this.stopBtShow = true;
       this.isStoped = false;
@@ -225,14 +268,9 @@ export default {
         return;
       }
       if (this.getCurrentSessionStatus() === 0) {
-        this.$message.warning('上个问题没有回答完！');
+        this.$message.warning(i18n.t('sse.incompleteError'));
         return;
       }
-
-      // if (this.sessionStatus === 0) {
-      //   this.$message.warning('上个问题没有回答完！');
-      //   return;
-      // }
 
       this.sseResponse = {};
       this.setStoreSessionStatus(0);
@@ -246,7 +284,6 @@ export default {
         fileList: this.fileList,
         pendingResponse: '',
       };
-      // this.$refs['session-com'].pushHistory(params);
       sessionCom.pushHistory(params);
 
       // 初始化流处理器
@@ -270,138 +307,112 @@ export default {
             ]
           : [];
 
-      this.ctrlAbort = new AbortController();
-      const userInfo = this.$store.state.user.userInfo || {};
+      this.eventSource = this.fetchEventSource(
+        this.rag_sseApi,
+        { ...this.sseParams, history: history },
+        {
+          onopen: async e => {
+            if (e.status !== 200) {
+              try {
+                const errorData = await e.json();
+                let commonData = {
+                  ...this.sseParams,
+                  query: prompt,
+                };
+                let fillData = {
+                  ...commonData,
+                  response: errorData.msg,
+                };
+                sessionCom.replaceLastData(lastIndex, fillData);
+              } catch (e) {
+                const text = await e.text();
+                this.$message.error(text || i18n.t('sse.error'));
+              }
 
-      this.eventSource = new fetchEventSource(this.origin + this.rag_sseApi, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + this.token,
-          'x-user-id': userInfo.uid,
-          'x-org-id': userInfo.orgId,
-        },
-        signal: this.ctrlAbort.signal,
-        body: JSON.stringify({ ...this.sseParams, history: history }),
-        openWhenHidden: true, //页面退至后台保持连接
-        onopen: async e => {
-          if (e.status !== 200) {
-            try {
-              const errorData = await e.json();
+              this.stopEventSource();
+              this.setStoreSessionStatus(-1);
+            }
+          },
+          onmessage: e => {
+            if (e && e.data) {
+              let data;
+              try {
+                data = JSON.parse(e.data);
+              } catch (error) {
+                return; // 如果解析失败，直接返回，不处理这条消息
+              }
+
+              this.sseResponse = data;
               let commonData = {
+                ...this.sseResponse,
                 ...this.sseParams,
                 query: prompt,
+                fileList: this.fileList,
+                response: '',
+                filepath: data.file_url || '',
+                requestFileUrls: '',
+                gen_file_url_list: [],
+                searchList:
+                  data.data && data.data.searchList ? data.data.searchList : [],
+                thinkText: i18n.t('sse.thinkingText'),
+                isOpen: true,
+                citations: [],
               };
-              let fillData = {
-                ...commonData,
-                response: errorData.msg,
-              };
-              // this.$refs['session-com'].replaceLastData(lastIndex, fillData);
-              sessionCom.replaceLastData(lastIndex, fillData);
-            } catch (e) {
-              const text = await e.text();
-              this.$message.error(text || '未知错误');
+
+              if (data.code === 0 || data.code === 1) {
+                //finish 0：进行中  1：关闭   2:敏感词关闭
+                let _sentence = data.data.output;
+
+                this._print.print(
+                  {
+                    response: _sentence,
+                    finish: data.finish,
+                  },
+                  commonData,
+                  (worldObj, search_list) => {
+                    this.setStoreSessionStatus(0);
+                    processor.updateSearchList(search_list);
+                    processor.append(worldObj.world);
+
+                    const renderResult = processor.getRenderResult();
+
+                    let fillData = {
+                      ...commonData,
+                      ...renderResult,
+                      finish: worldObj.finish,
+                      searchList: search_list
+                        ? search_list.map(n => ({
+                            ...n,
+                            snippet: n.snippet ? md.render(n.snippet) : '',
+                          }))
+                        : [],
+                    };
+
+                    if (worldObj.finish === 2) {
+                      fillData.response = this.$t('sse.sensitiveTips');
+                      sessionCom.replaceLastData(lastIndex, fillData);
+                      this.$nextTick(() => sessionCom.scrollBottom());
+                      this.setStoreSessionStatus(-1);
+                    } else {
+                      sessionCom.replaceLastData(lastIndex, fillData);
+                    }
+
+                    if (worldObj.isEnd && worldObj.finish === 1) {
+                      this.setStoreSessionStatus(-1);
+                    }
+                  },
+                );
+              } else if (data.code === 7 || data.code === -1) {
+                this.setStoreSessionStatus(-1);
+                sessionCom.replaceLastData(lastIndex, {
+                  ...commonData,
+                  response: data.message,
+                });
+              }
             }
-
-            this.stopEventSource();
-            this.setStoreSessionStatus(-1);
-            return;
-          }
+          },
         },
-        onmessage: e => {
-          if (e && e.data) {
-            let data;
-            try {
-              data = JSON.parse(e.data);
-            } catch (error) {
-              return; // 如果解析失败，直接返回，不处理这条消息
-            }
-
-            this.sseResponse = data;
-            let commonData = {
-              ...this.sseResponse,
-              ...this.sseParams,
-              query: prompt,
-              fileList: this.fileList,
-              response: '',
-              filepath: data.file_url || '',
-              requestFileUrls: '',
-              gen_file_url_list: [],
-              searchList:
-                data.data && data.data.searchList ? data.data.searchList : [],
-              thinkText: '思考中',
-              isOpen: true,
-              citations: [],
-            };
-
-            if (data.code === 0 || data.code === 1) {
-              //finish 0：进行中  1：关闭   2:敏感词关闭
-              let _sentence = data.data.output;
-
-              this._print.print(
-                {
-                  response: _sentence,
-                  finish: data.finish,
-                },
-                commonData,
-                (worldObj, search_list) => {
-                  this.setStoreSessionStatus(0);
-                  processor.updateSearchList(search_list);
-                  processor.append(worldObj.world);
-
-                  const renderResult = processor.getRenderResult();
-
-                  let fillData = {
-                    ...commonData,
-                    ...renderResult,
-                    finish: worldObj.finish,
-                    searchList: search_list
-                      ? search_list.map(n => ({
-                          ...n,
-                          snippet: n.snippet ? md.render(n.snippet) : '',
-                        }))
-                      : [],
-                  };
-
-                  if (worldObj.finish === 2) {
-                    fillData.response = this.$t('yuanjing.sensitiveTips');
-                    sessionCom.replaceLastData(lastIndex, fillData);
-                    this.$nextTick(() => sessionCom.scrollBottom());
-                    this.setStoreSessionStatus(-1);
-                  } else {
-                    sessionCom.replaceLastData(lastIndex, fillData);
-                  }
-
-                  if (worldObj.isEnd && worldObj.finish === 1) {
-                    this.setStoreSessionStatus(-1);
-                  }
-                },
-              );
-            } else if (data.code === 7 || data.code === -1) {
-              this.setStoreSessionStatus(-1);
-              sessionCom.replaceLastData(lastIndex, {
-                ...commonData,
-                response: data.message,
-              });
-            }
-          }
-        },
-        onclose: () => {
-          console.log('===> eventSource onClose');
-          this.setStoreSessionStatus(-1); //关闭后改变状态
-          this.sseOnCloseCallBack();
-        },
-        onerror: e => {
-          console.log('服务连接异常请重试！');
-          if (e.readyState === EventSource.CLOSED) {
-            console.log('connection is closed');
-          } else {
-            console.log('Error occured', e);
-          }
-          this.stopEventSource(); //前端主动关闭连接
-          this.setStoreSessionStatus(-1); //关闭后改变状态
-        },
-      });
+      );
     },
     doSend(params) {
       this.stopBtShow = true;
@@ -416,9 +427,8 @@ export default {
         console.warn('[sseMethod] session-com ref missing');
         return;
       }
-      const userInfo = this.$store.state.user.userInfo || {};
       if (this.getCurrentSessionStatus() === 0) {
-        this.$message.warning('上个问题没有回答完！');
+        this.$message.warning(i18n.t('sse.incompleteError'));
         return;
       }
 
@@ -434,8 +444,6 @@ export default {
         fileList: this.fileList,
         pendingResponse: '',
       };
-      //正式环境传模型参数
-      // this.$refs['session-com'].pushHistory(params)
       sessionCom.pushHistory(params);
 
       this._print = new Print({
@@ -453,7 +461,7 @@ export default {
         } else {
           this.sseApi = AGENT_API_URL;
         }
-        const trial = this.isTestChat ? true : false;
+        const trial = this.isTestChat;
         data = {
           ...this.sseParams,
           prompt,
@@ -463,8 +471,8 @@ export default {
         headers = {
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + this.token,
-          'x-user-id': userInfo.uid,
-          'x-org-id': userInfo.orgId,
+          'x-user-id': this.userInfo.uid,
+          'x-org-id': this.userInfo.orgId,
         };
       } else {
         this.sseApi = `${OPENURL_API}/agent/${this.sseParams.assistantId}/stream`;
@@ -481,13 +489,8 @@ export default {
       this._subConversionProcessors = new Map(); // 每个 order 的子处理器
       this._mainProcessors = new Map(); // 每个 order 的主处理器
 
-      this.ctrlAbort = new AbortController();
-      this.eventSource = new fetchEventSource(this.origin + this.sseApi, {
-        method: 'POST',
+      this.eventSource = this.fetchEventSource(this.sseApi, data, {
         headers,
-        signal: this.ctrlAbort.signal,
-        body: JSON.stringify(data),
-        openWhenHidden: true, //页面退至后台保持连接
         ...(this.type === 'webChat' && { isOpenUrl: true }),
         onopen: async e => {
           console.log('已建立SSE连接~', new Date().getTime());
@@ -505,7 +508,7 @@ export default {
               sessionCom.replaceLastData(lastIndex, fillData);
             } catch (e) {
               const text = await e.text();
-              this.$message.error(text || '未知错误');
+              this.$message.error(text || i18n.t('sse.error'));
             }
 
             this.stopEventSource();
@@ -725,11 +728,10 @@ export default {
                       if (worldObj.finish === 4) {
                         let fillData = {
                           ...commonData,
-                          response: i18n.t('yuanjing.sensitiveTips'),
+                          response: i18n.t('sse.sensitiveTips'),
                           subConversions: subConversionsList,
                           messageSequence: sequence,
                         };
-                        // this.$refs['session-com'].replaceLastData(lastIndex, fillData)
                         sessionCom.replaceLastData(lastIndex, fillData);
                         this.$nextTick(() => {
                           sessionCom.scrollBottom();
@@ -756,26 +758,10 @@ export default {
                 response: data.message,
                 subConversions: subConversionsList,
               };
-              // this.$refs['session-com'].replaceLastData(lastIndex, fillData)
               sessionCom.replaceLastData(lastIndex, fillData);
               this._currentMainFinish = undefined;
             }
           }
-        },
-        onclose: () => {
-          console.log('===> eventSource onClose');
-          this.setStoreSessionStatus(-1); //关闭后改变状态
-          this.sseOnCloseCallBack();
-        },
-        onerror: e => {
-          console.log('服务连接异常请重试！');
-          if (e.readyState === EventSource.CLOSED) {
-            console.log('connection is closed');
-          } else {
-            console.log('Error occured', e);
-          }
-          this.stopEventSource(); //前端主动关闭连接
-          this.setStoreSessionStatus(-1); //关闭后改变状态
         },
       });
     },
@@ -803,24 +789,14 @@ export default {
           // this.setStoreSessionStatus(-1)
         },
       });
-      this.ctrlAbort = new AbortController();
-      const userInfo = this.$store.state.user.userInfo || {};
-      this.eventSource = new fetchEventSource(
-        this.origin + this.exprience_sseApi,
+
+      this.eventSource = this.fetchEventSource(
+        this.exprience_sseApi,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + this.token,
-            'x-user-id': userInfo.uid,
-            'x-org-id': userInfo.orgId,
-          },
-          signal: this.ctrlAbort.signal,
-          body: JSON.stringify({
-            ...this.apiParams,
-            content: prompt,
-          }),
-          openWhenHidden: true, //页面退至后台保持连接
+          ...this.apiParams,
+          content: prompt,
+        },
+        {
           onopen: async e => {
             //console.log("已建立SSE连接~",new Date().getTime());
             if (e.status !== 200) {
@@ -837,7 +813,7 @@ export default {
                 this.$refs['session-com'].replaceLastData(lastIndex, fillData);
               } catch (e) {
                 const text = await e.text();
-                this.$message.error(text || '未知错误');
+                this.$message.error(text || i18n.t('sse.error'));
               }
 
               this.stopEventSource();
@@ -884,7 +860,7 @@ export default {
                     ? this.sseResponse.data.searchList
                     : [],
                 gen_file_url_list: [],
-                thinkText: '思考中',
+                thinkText: i18n.t('sse.thinkingText'),
                 isOpen: true,
                 citations: [],
                 qa_type: 0, // 为了组件复用，前端加了标识
@@ -933,22 +909,6 @@ export default {
                 );
               }
             }
-          },
-          onclose: () => {
-            this.setStoreSessionStatus(-1); //关闭后改变状态
-            this.sseOnCloseCallBack();
-          },
-          onerror: e => {
-            /**
-            console.log('服务连接异常请重试！');
-            if (e.readyState === EventSource.CLOSED) {
-              console.log('connection is closed');
-            } else {
-              console.log('Error occured', e);
-            }
-          * */
-            this.stopEventSource(); //前端主动关闭连接
-            this.setStoreSessionStatus(-1); //关闭后改变状态
           },
         },
       );

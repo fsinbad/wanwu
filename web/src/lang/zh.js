@@ -1749,6 +1749,15 @@ export default {
     close: '关闭',
     reload: '刷新',
   },
+  sse: {
+    sensitiveTips:
+      '您当前请求或者历史信息中包含敏感内容，根据相关安全要求，该轮对话终止，请清除历史信息或者重新开启新的对话。',
+    thinkingText: '思考中',
+    error: '未知错误',
+    connectError: '连接失败，请稍后再试',
+    incompleteError: '上个问题没有回答完！',
+    timeoutError: '请求超时，请稍后再试',
+  },
   oauth: {
     title: 'OAuth密钥管理',
     name: '第三方平台名称',
