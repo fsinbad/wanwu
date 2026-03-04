@@ -166,6 +166,7 @@
                 class="cover-input-icon model-select"
                 :loading="modelLoading"
                 filterable
+                warning
               />
             </div>
           </div>

@@ -76,7 +76,7 @@ export default {
     },
     warning: {
       type: Boolean,
-      default: true,
+      default: false,
     },
   },
   data() {

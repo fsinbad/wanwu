@@ -154,6 +154,7 @@
                   :loading="rerankLoading"
                   clearable
                   filterable
+                  :warning="!setType"
                 />
               </el-col>
             </el-row>
