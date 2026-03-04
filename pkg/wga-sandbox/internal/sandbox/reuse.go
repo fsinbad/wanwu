@@ -135,12 +135,12 @@ func (s *reuseSandbox) copyDirToSandbox(ctx context.Context, localDir, sandboxPa
 		return nil
 	}
 
-	tarData, err := util.TarDir(localDir)
+	tarData, err := util.TarDir(localDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to tar directory: %w", err)
 	}
 
-	tarName := filepath.Base(localDir) + ".tar"
+	tarName := filepath.Base(filepath.Clean(localDir)) + ".tar"
 	tarPath := filepath.Join(s.workDir, tarName)
 
 	if err := s.client.uploadData(ctx, tarData, tarPath); err != nil {
@@ -152,7 +152,7 @@ func (s *reuseSandbox) copyDirToSandbox(ctx context.Context, localDir, sandboxPa
 		return fmt.Errorf("failed to create remote directory: %w", err)
 	}
 
-	cmd := fmt.Sprintf("cd %s && tar -xzf %s && rm %s", sandboxPath, tarPath, tarPath)
+	cmd := fmt.Sprintf("cd %s && tar -xf %s && rm %s", sandboxPath, tarPath, tarPath)
 	if _, err := s.client.exec(ctx, cmd, s.workDir); err != nil {
 		return fmt.Errorf("failed to extract tar: %w", err)
 	}
@@ -161,6 +161,9 @@ func (s *reuseSandbox) copyDirToSandbox(ctx context.Context, localDir, sandboxPa
 }
 
 func (s *reuseSandbox) copyFileToSandbox(ctx context.Context, localFile, sandboxPath string) error {
+	if sandboxPath == s.workDir {
+		sandboxPath = filepath.Join(s.workDir, filepath.Base(localFile))
+	}
 	return s.client.upload(ctx, localFile, sandboxPath)
 }
 
@@ -178,7 +181,7 @@ func (s *reuseSandbox) copyDirFromSandbox(ctx context.Context, localPath string)
 	tarName := filepath.Base(s.workDir) + ".tar"
 	tarPath := filepath.Join(filepath.Dir(s.workDir), tarName)
 
-	cmd := fmt.Sprintf("cd %s && tar -czf %s %s", filepath.Dir(s.workDir), tarName, filepath.Base(s.workDir))
+	cmd := fmt.Sprintf("cd %s && tar -cf %s %s", filepath.Dir(s.workDir), tarName, filepath.Base(s.workDir))
 	if _, err := s.client.exec(ctx, cmd, "/"); err != nil {
 		return fmt.Errorf("failed to create tar: %w", err)
 	}

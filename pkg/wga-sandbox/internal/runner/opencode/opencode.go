@@ -138,7 +138,7 @@ func (r *Runner) BeforeRun(ctx context.Context) error {
 	}
 
 	if r.req.InputDir != "" {
-		if err := r.sb.CopyToSandbox(ctx, r.req.InputDir+"/."); err != nil {
+		if err := r.sb.CopyToSandbox(ctx, r.req.InputDir); err != nil {
 			return fmt.Errorf("failed to copy input to workspace: %w", err)
 		}
 	}
