@@ -1344,6 +1344,12 @@ const docTemplate = `{
                 "response": {
                     "type": "string"
                 },
+                "responseList": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ConversationResponse"
+                    }
+                },
                 "searchList": {},
                 "subConversationList": {
                     "type": "array",
@@ -1372,6 +1378,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ConversationResponse": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "integer"
+                },
+                "response": {
                     "type": "string"
                 }
             }
@@ -1440,6 +1457,9 @@ const docTemplate = `{
                 "name": {
                     "description": "事件名称",
                     "type": "string"
+                },
+                "order": {
+                    "type": "integer"
                 },
                 "parentId": {
                     "description": "事件挂载id",

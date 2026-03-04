@@ -9342,7 +9342,7 @@ const docTemplate = `{
                 "tags": [
                     "model"
                 ],
-                "summary": "查询单个模型",
+                "summary": "‌查询单个模型",
                 "parameters": [
                     {
                         "description": "模型ID",
@@ -9763,7 +9763,13 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "模型作用域类型",
+                        "description": "模型作用域类型: public,private",
+                        "name": "filterScope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "模型公开范围: 1,2,3",
                         "name": "scopeType",
                         "in": "query"
                     }
@@ -20618,6 +20624,12 @@ const docTemplate = `{
                 "response": {
                     "type": "string"
                 },
+                "responseList": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ConversationResponse"
+                    }
+                },
                 "searchList": {},
                 "subConversationList": {
                     "type": "array",
@@ -20646,6 +20658,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ConversationResponse": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "integer"
+                },
+                "response": {
                     "type": "string"
                 }
             }
@@ -23993,6 +24016,9 @@ const docTemplate = `{
                 "name": {
                     "description": "事件名称",
                     "type": "string"
+                },
+                "order": {
+                    "type": "integer"
                 },
                 "parentId": {
                     "description": "事件挂载id",
