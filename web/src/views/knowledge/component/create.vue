@@ -114,6 +114,7 @@
                   : EmbeddingOptions
               "
               :disabled="isEdit"
+              warning
             />
           </el-form-item>
           <el-form-item
@@ -158,7 +159,8 @@
               @visible-change="visibleChange"
               :loading-text="$t('knowledgeManage.create.modelLoading')"
               :loading="modelLoading"
-              :filterable="true"
+              filterable
+              warning
               :disabled="isEdit"
             />
           </el-form-item>
