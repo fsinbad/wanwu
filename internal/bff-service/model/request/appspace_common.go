@@ -68,6 +68,8 @@ type AppKnowledgeBase struct {
 	GraphSwitch          int32                 `json:"graphSwitch"` // 知识图谱开关
 	External             int32                 `json:"external"`    // 外部数据库标识
 	Category             int32                 `json:"category"`    // 知识库类别 0-知识库，1-问答库，2-多模态知识库
+	OrgName              string                `json:"orgName"`     //知识库所属名称
+	Share                bool                  `json:"share"`       //是分享，还是私有
 	MetaDataFilterParams *MetaDataFilterParams `json:"metaDataFilterParams"`
 }
 
@@ -94,6 +96,8 @@ type AppQAKnowledgeBase struct {
 	ID                   string                `json:"id" validate:"required"` // 知识库id
 	Name                 string                `json:"name"`
 	Category             int32                 `json:"category"` // 知识库类别 0-知识库，1-问答库，2-多模态知识库
+	OrgName              string                `json:"orgName"`  //知识库所属名称
+	Share                bool                  `json:"share"`    //是分享，还是私有
 	MetaDataFilterParams *MetaDataFilterParams `json:"metaDataFilterParams"`
 }
 
