@@ -8,6 +8,7 @@ import (
 	app_service "github.com/UnicomAI/wanwu/api/proto/app-service"
 	assistant_service "github.com/UnicomAI/wanwu/api/proto/assistant-service"
 	"github.com/UnicomAI/wanwu/api/proto/common"
+	iam_service "github.com/UnicomAI/wanwu/api/proto/iam-service"
 	knowledgeBase_service "github.com/UnicomAI/wanwu/api/proto/knowledgebase-service"
 	mcp_service "github.com/UnicomAI/wanwu/api/proto/mcp-service"
 	model_service "github.com/UnicomAI/wanwu/api/proto/model-service"
@@ -1107,7 +1108,7 @@ func transKnowledgeBases2Model(ctx *gin.Context, kbConfig *assistant_service.Ass
 		}, err
 	}
 
-	knowledgeBases := buildKnowledgeBases(kbInfoList, kbConfig.KnowledgeBaseIds, kbConfig.AppKnowledgeBaseList)
+	knowledgeBases := buildKnowledgeBases(ctx, kbInfoList, kbConfig.KnowledgeBaseIds, kbConfig.AppKnowledgeBaseList)
 
 	return request.AppKnowledgebaseConfig{
 		Knowledgebases: knowledgeBases,
@@ -1127,7 +1128,7 @@ func transKnowledgeBases2Model(ctx *gin.Context, kbConfig *assistant_service.Ass
 
 }
 
-func buildKnowledgeBases(kbInfoList *knowledgeBase_service.KnowledgeDetailSelectListResp, kbIdList []string, kbConfigList []*assistant_service.AppKnowledgeBase) []request.AppKnowledgeBase {
+func buildKnowledgeBases(ctx *gin.Context, kbInfoList *knowledgeBase_service.KnowledgeDetailSelectListResp, kbIdList []string, kbConfigList []*assistant_service.AppKnowledgeBase) []request.AppKnowledgeBase {
 	if len(kbInfoList.List) == 0 {
 		return make([]request.AppKnowledgeBase, 0)
 	}
@@ -1142,6 +1143,16 @@ func buildKnowledgeBases(kbInfoList *knowledgeBase_service.KnowledgeDetailSelect
 			if info == nil {
 				continue
 			}
+			share := info.ShareCount > 1
+			var orgName string
+			if share {
+				orgInfo, err := iam.GetOrgInfo(ctx, &iam_service.GetOrgInfoReq{OrgId: info.CreateOrgId})
+				if err != nil {
+					log.Errorf("get org info error: %v", err)
+				} else {
+					orgName = buildShareOrgName(share, orgInfo.Name)
+				}
+			}
 			params := buildAssistantMetaDataFilterParams(kbConfig)
 			knowledgeBases = append(knowledgeBases, request.AppKnowledgeBase{
 				ID:                   kbConfig.KnowledgeBaseId,
@@ -1149,6 +1160,8 @@ func buildKnowledgeBases(kbInfoList *knowledgeBase_service.KnowledgeDetailSelect
 				GraphSwitch:          info.GraphSwitch,
 				External:             info.External,
 				Category:             info.Category,
+				Share:                share,
+				OrgName:              orgName,
 				MetaDataFilterParams: params,
 			})
 		}

@@ -9,6 +9,7 @@ import (
 	app_service "github.com/UnicomAI/wanwu/api/proto/app-service"
 	"github.com/UnicomAI/wanwu/api/proto/common"
 	err_code "github.com/UnicomAI/wanwu/api/proto/err-code"
+	iam_service "github.com/UnicomAI/wanwu/api/proto/iam-service"
 	knowledgeBase_service "github.com/UnicomAI/wanwu/api/proto/knowledgebase-service"
 	model_service "github.com/UnicomAI/wanwu/api/proto/model-service"
 	rag_service "github.com/UnicomAI/wanwu/api/proto/rag-service"
@@ -492,12 +493,24 @@ func ragKBConfigProto2Model(ctx *gin.Context, kbConfig *rag_service.RagKnowledge
 			continue
 		}
 		// 基础信息映射
+		share := kbInfo.ShareCount > 1
+		var orgName string
+		if share {
+			orgInfo, err := iam.GetOrgInfo(ctx, &iam_service.GetOrgInfoReq{OrgId: kbInfo.CreateOrgId})
+			if err != nil {
+				log.Errorf("get org info error: %v", err)
+			} else {
+				orgName = buildShareOrgName(share, orgInfo.Name)
+			}
+		}
 		knowledge := request.AppKnowledgeBase{
 			ID:          perConfig.KnowledgeId,
 			Name:        kbInfo.Name,
 			GraphSwitch: kbInfo.GraphSwitch,
 			External:    kbInfo.External,
 			Category:    kbInfo.Category,
+			OrgName:     orgName,
+			Share:       share,
 		}
 		// 转换元数据过滤配置
 		metaFilter := perConfig.RagMetaFilter
@@ -546,10 +559,22 @@ func ragKBQAConfigProto2Model(ctx *gin.Context, kbConfig *rag_service.RagQAKnowl
 			continue
 		}
 		// 基础信息映射
+		share := kbInfo.ShareCount > 1
+		var orgName string
+		if share {
+			orgInfo, err := iam.GetOrgInfo(ctx, &iam_service.GetOrgInfoReq{OrgId: kbInfo.CreateOrgId})
+			if err != nil {
+				log.Errorf("get org info error: %v", err)
+			} else {
+				orgName = buildShareOrgName(share, orgInfo.Name)
+			}
+		}
 		knowledge := request.AppQAKnowledgeBase{
 			ID:       perConfig.KnowledgeId,
 			Name:     kbInfo.Name,
 			Category: kbInfo.Category,
+			OrgName:  orgName,
+			Share:    share,
 		}
 		// 转换元数据过滤配置
 		metaFilter := perConfig.RagMetaFilter
