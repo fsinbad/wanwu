@@ -12,7 +12,7 @@ import (
 func registerRag(apiV1 *gin.RouterGroup) {
 	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag", http.MethodPost, v1.CreateRag, "创建rag")
 	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag", http.MethodPut, v1.UpdateRag, "修改rag基本信息")
-	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag/config", http.MethodPut, v1.UpdateRagConfig, "修改rag配置信息", middleware.AuthModel([]string{"modelConfig.modelId", "rerankConfig.modelId", "qaRerankConfig.modelId"}))
+	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag/config", http.MethodPut, v1.UpdateRagConfig, "修改rag配置信息", middleware.AuthModelByModelId([]string{"modelConfig.modelId", "rerankConfig.modelId", "qaRerankConfig.modelId"}))
 	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag", http.MethodDelete, v1.DeleteRag, "删除rag")
 	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag/draft", http.MethodGet, v1.GetDraftRag, "获取草稿rag详情")
 	mid.Sub("app.rag").Reg(apiV1, "/appspace/rag", http.MethodGet, v1.GetPublishedRag, "获取已发布rag详情")

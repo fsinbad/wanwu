@@ -25,7 +25,7 @@ func Register(openAPI *gin.RouterGroup) {
 	mid.Sub("openapi").Reg(openAPI, "/chatflow/chat", http.MethodPost, openapi.ChatflowChat, "对话流OpenAPI", middleware.AuthOpenAPIKey(constant.OpenAPITypeChatflow))
 	// knowledge
 	mid.Sub("openapi").Reg(openAPI, "/file/upload/direct", http.MethodPost, openapi.DirectUploadFiles, "直接上传文件", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge))
-	mid.Sub("openapi").Reg(openAPI, "/knowledge", http.MethodPost, openapi.CreateKnowledge, "新建知识库", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthModel([]string{"embeddingModelInfo.modelId", "knowledgeGraph.llmModelId"}))
+	mid.Sub("openapi").Reg(openAPI, "/knowledge", http.MethodPost, openapi.CreateKnowledge, "新建知识库", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthModelByUuid([]string{"embeddingModelInfo.modelId", "knowledgeGraph.llmModelId"}))
 	mid.Sub("openapi").Reg(openAPI, "/knowledge", http.MethodPut, openapi.UpdateKnowledge, "更新知识库", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeSystem))
 	mid.Sub("openapi").Reg(openAPI, "/knowledge", http.MethodDelete, openapi.DeleteKnowledge, "删除知识库", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeSystem))
 	mid.Sub("openapi").Reg(openAPI, "/knowledge/select", http.MethodPost, openapi.GetKnowledgeSelect, "查询知识库列表", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge))
@@ -38,7 +38,7 @@ func Register(openAPI *gin.RouterGroup) {
 	mid.Sub("openapi").Reg(openAPI, "/knowledge/export/record/list", http.MethodGet, openapi.GetKnowledgeExportRecordList, "获取知识库导出记录列表", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeView))
 	mid.Sub("openapi").Reg(openAPI, "/knowledge/export/record", http.MethodDelete, openapi.DeleteKnowledgeExportRecord, "删除知识库库导出记录", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeEdit))
 	mid.Sub("openapi").Reg(openAPI, "/knowledge/doc", http.MethodDelete, openapi.DeleteDoc, "删除文档", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeEdit))
-	mid.Sub("openapi").Reg(openAPI, "/knowledge/hit", http.MethodPost, openapi.KnowledgeHit, "知识库命中测试", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthModel([]string{"knowledgeMatchParams.rerankModelId"}))
+	mid.Sub("openapi").Reg(openAPI, "/knowledge/hit", http.MethodPost, openapi.KnowledgeHit, "知识库命中测试", middleware.AuthOpenAPIKey(constant.OpenAPITypeKnowledge), middleware.AuthModelByUuid([]string{"knowledgeMatchParams.rerankModelId"}))
 
 	// mcp server
 	mid.Sub("openapi").Reg(openAPI, "/mcp/server/sse", http.MethodGet, openapi.GetMCPServerSSE, "新建MCP服务sse连接", middleware.AuthAppKeyByQuery(constant.AppTypeMCPServer))

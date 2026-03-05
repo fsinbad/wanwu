@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+
 	mp_common "github.com/UnicomAI/wanwu/pkg/model-provider/mp-common"
 
 	err_code "github.com/UnicomAI/wanwu/api/proto/err-code"
@@ -187,15 +188,15 @@ func CheckModelUserPermission(ctx *gin.Context, userId, orgId string, modelIds [
 	return authorizedModelIds, nil
 }
 
-// --- internal ---
-
-func getModelIdByUuid(ctx *gin.Context, uuid string) (string, error) {
+func GetModelIdByUuid(ctx *gin.Context, uuid string) (string, error) {
 	resp, err := model.GetModelByUuid(ctx, &model_service.GetModelByUuidReq{Uuid: uuid})
 	if err != nil {
 		return "", err
 	}
 	return resp.ModelId, nil
 }
+
+// --- internal ---
 
 func parseImportAndUpdateClientReq(userId, orgId string, req *request.ImportOrUpdateModelRequest) (*model_service.ModelInfo, error) {
 	if req.ScopeType == config.ModelScopeTypePublic {

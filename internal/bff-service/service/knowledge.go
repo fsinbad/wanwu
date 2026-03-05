@@ -168,13 +168,13 @@ func CreateKnowledge(ctx *gin.Context, userId, orgId string, r *request.CreateKn
 }
 
 func CreateKnowledgeOpenapi(ctx *gin.Context, userId, orgId string, r *request.CreateKnowledgeReq) (*response.CreateKnowledgeResp, error) {
-	embModelId, err := getModelIdByUuid(ctx, r.EmbeddingModel.ModelId)
+	embModelId, err := GetModelIdByUuid(ctx, r.EmbeddingModel.ModelId)
 	if err != nil {
 		return nil, err
 	}
 	r.EmbeddingModel.ModelId = embModelId
 	if r.Category == request.CategoryKnowledge && r.KnowledgeGraph.Switch {
-		llmModelId, err := getModelIdByUuid(ctx, r.KnowledgeGraph.LLMModelId)
+		llmModelId, err := GetModelIdByUuid(ctx, r.KnowledgeGraph.LLMModelId)
 		if err != nil {
 			return nil, err
 		}
@@ -276,7 +276,7 @@ func checkRerank(ctx *gin.Context, rerankModelId, question string, hasImage bool
 
 func KnowledgeHitOpenapi(ctx *gin.Context, userId, orgId string, r *request.KnowledgeHitReq) (*response.KnowledgeHitResp, error) {
 	if r.KnowledgeMatchParams.RerankModelId != "" {
-		rerankModelId, err := getModelIdByUuid(ctx, r.KnowledgeMatchParams.RerankModelId)
+		rerankModelId, err := GetModelIdByUuid(ctx, r.KnowledgeMatchParams.RerankModelId)
 		if err != nil {
 			return nil, err
 		}

@@ -164,7 +164,7 @@ func ImportDoc(ctx *gin.Context, userId, orgId string, req *request.DocImportReq
 func ImportDocOpenapi(ctx *gin.Context, userId, orgId string, req *request.DocImportReq) error {
 	var err error
 	if req.ParserModelId != "" {
-		req.ParserModelId, err = getModelIdByUuid(ctx, req.ParserModelId)
+		req.ParserModelId, err = GetModelIdByUuid(ctx, req.ParserModelId)
 		if err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ func UpdateDocConfig(ctx *gin.Context, userId, orgId string, req *request.DocCon
 func UpdateDocConfigOpenapi(ctx *gin.Context, userId, orgId string, req *request.DocConfigUpdateReq) error {
 	var err error
 	if req.ParserModelId != "" {
-		req.ParserModelId, err = getModelIdByUuid(ctx, req.ParserModelId)
+		req.ParserModelId, err = GetModelIdByUuid(ctx, req.ParserModelId)
 		if err != nil {
 			return err
 		}

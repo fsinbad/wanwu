@@ -11,12 +11,12 @@ import (
 
 func registerKnowledge(apiV1 *gin.RouterGroup) {
 	// 知识库增删改查
-	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge", http.MethodPost, v1.CreateKnowledge, "创建知识库（文档分类）", middleware.AuthModel([]string{"embeddingModelInfo.modelId", "knowledgeGraph.llmModelId"}))
+	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge", http.MethodPost, v1.CreateKnowledge, "创建知识库（文档分类）", middleware.AuthModelByModelId([]string{"embeddingModelInfo.modelId", "knowledgeGraph.llmModelId"}))
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge", http.MethodPut, v1.UpdateKnowledge, "修改知识库（文档分类）", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeSystem))
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge", http.MethodDelete, v1.DeleteKnowledge, "删除知识库（文档分类）", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeSystem))
 
 	// 知识库命中测试，通用校验不好做改内部校验
-	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/hit", http.MethodPost, v1.KnowledgeHit, "知识库命中测试", middleware.AuthModel([]string{"knowledgeMatchParams.rerankModelId"}))
+	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/hit", http.MethodPost, v1.KnowledgeHit, "知识库命中测试", middleware.AuthModelByModelId([]string{"knowledgeMatchParams.rerankModelId"}))
 
 	// 知识库文档
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/doc/config", http.MethodGet, v1.GetDocConfig, "获取文档配置信息", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeView))
@@ -106,7 +106,7 @@ func registerKnowledge(apiV1 *gin.RouterGroup) {
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/qa/pair/import/tip", http.MethodGet, v1.GetKnowledgeQAPairImportTip, "获取问答库文档上传状态", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeView))
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/qa/export", http.MethodGet, v1.ExportKnowledgeQAPair, "问答库文档导出", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeEdit))
 
-	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/qa/hit", http.MethodPost, v1.KnowledgeQAHit, "问答库命中测试", middleware.AuthModel([]string{"knowledgeMatchParams.rerankModelId"}))
+	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/qa/hit", http.MethodPost, v1.KnowledgeQAHit, "问答库命中测试", middleware.AuthModelByModelId([]string{"knowledgeMatchParams.rerankModelId"}))
 
 	// 知识库导出记录
 	mid.Sub("resource.knowledge").Reg(apiV1, "/knowledge/export/record/list", http.MethodGet, v1.GetKnowledgeExportRecordList, "获取知识库导出记录列表", middleware.AuthKnowledge("knowledgeId", middleware.KnowledgeView))

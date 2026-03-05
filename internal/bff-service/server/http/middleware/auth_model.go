@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -15,78 +14,19 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-// AuthModel 校验多个可能的 modelId 字段路径
+// AuthModelByModelId 校验多个可能的 modelId 字段路径
 // fieldPaths: 如 []string{"modelConfig.modelId", "recommendConfig.modelId"}
-func AuthModel(fields []string) func(ctx *gin.Context) {
+func AuthModelByModelId(fields []string) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		defer util.PrintPanicStack()
 
-		var modelIds []string
-
-		// 1. 尝试从 Query 参数获取（仅支持顶层字段，不支持嵌套）
-		for _, field := range fields {
-			// 如果路径不含 "."，说明可能是 query 参数
-			if !strings.Contains(field, ".") {
-				if val := ctx.Query(field); val != "" {
-					modelIds = append(modelIds, val)
-				}
-			}
-		}
-
-		// 2. 从 JSON Body 提取（支持嵌套）
-		if ctx.ContentType() == binding.MIMEJSON {
-			bodyStr, _ := requestBody(ctx)
-			if bodyStr != "" {
-				var paramsMap map[string]interface{}
-				if json.Unmarshal([]byte(bodyStr), &paramsMap) == nil {
-					for _, field := range fields {
-						if val, ok := getNestedValue(paramsMap, field); ok {
-							modelID, ok := val.(string)
-							if !ok {
-								gin_util.Response(ctx, nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("field %s must be string type", field)))
-								return
-							}
-							modelIds = append(modelIds, modelID)
-						}
-					}
-				}
-			}
-		}
-
-		// 3. 去重
-		uniqueModelIds := make(map[string]bool)
-		var finalModelIds []string
-		for _, id := range modelIds {
-			if !uniqueModelIds[id] {
-				uniqueModelIds[id] = true
-				finalModelIds = append(finalModelIds, id)
-			}
-		}
-
-		// 4. 如果没有 modelId，直接放行
-		if len(finalModelIds) == 0 {
+		modelIds := extractFieldsFromRequest(ctx, fields)
+		if len(modelIds) == 0 {
 			ctx.Next()
 			return
 		}
 
-		// 5. 获取用户和组织 ID
-		userID, _ := getUserID(ctx)
-		if userID == "" {
-			gin_util.ResponseErrCodeKeyWithStatus(ctx, http.StatusBadRequest, err_code.Code_BFFAuth, "", "auth model userID not found")
-			ctx.Abort()
-			return
-		}
-
-		orgID, _ := getOrgID(ctx)
-		if orgID == "" {
-			gin_util.ResponseErrCodeKeyWithStatus(ctx, http.StatusBadRequest, err_code.Code_BFFAuth, "", "auth model orgID not found")
-			ctx.Abort()
-			return
-		}
-
-		// 6. 逐个校验模型权限
-
-		if _, err := service.CheckModelUserPermission(ctx, userID, orgID, finalModelIds); err != nil {
+		if err := checkModelPermission(ctx, modelIds); err != nil {
 			gin_util.ResponseErrWithStatus(ctx, http.StatusBadRequest, err)
 			ctx.Abort()
 			return
@@ -94,6 +34,102 @@ func AuthModel(fields []string) func(ctx *gin.Context) {
 
 		ctx.Next()
 	}
+}
+
+// AuthModelByUuid 校验多个可能的 ModelUuid 字段路径
+// fieldPaths: 如 []string{"modelConfig.modelId", "recommendConfig.modelId"}
+func AuthModelByUuid(fields []string) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		defer util.PrintPanicStack()
+
+		uuids := extractFieldsFromRequest(ctx, fields)
+		if len(uuids) == 0 {
+			ctx.Next()
+			return
+		}
+		var modelIds []string
+		for _, uuid := range uuids {
+			modelId, err := service.GetModelIdByUuid(ctx, uuid)
+			if err != nil {
+				gin_util.ResponseErrWithStatus(ctx, http.StatusBadRequest, err)
+				ctx.Abort()
+				return
+			}
+			modelIds = append(modelIds, modelId)
+		}
+
+		if err := checkModelPermission(ctx, modelIds); err != nil {
+			gin_util.ResponseErrWithStatus(ctx, http.StatusBadRequest, err)
+			ctx.Abort()
+			return
+		}
+
+		ctx.Next()
+	}
+}
+
+// checkModelPermission 检查模型权限
+func checkModelPermission(ctx *gin.Context, modelIds []string) error {
+	// 获取用户和组织 ID
+	userID, _ := getUserID(ctx)
+	if userID == "" {
+		return grpc_util.ErrorStatus(err_code.Code_BFFAuth, "auth model userID not found")
+	}
+
+	orgID, _ := getOrgID(ctx)
+	if orgID == "" {
+		return grpc_util.ErrorStatus(err_code.Code_BFFAuth, "auth model orgID not found")
+	}
+
+	// 校验模型权限
+	_, err := service.CheckModelUserPermission(ctx, userID, orgID, modelIds)
+	return err
+}
+
+// extractFieldsFromRequest 从请求中提取字段值
+func extractFieldsFromRequest(ctx *gin.Context, fields []string) []string {
+	var values []string
+
+	// 1. 尝试从 Query 参数获取（仅支持顶层字段，不支持嵌套）
+	for _, field := range fields {
+		// 如果路径不含 "."，说明可能是 query 参数
+		if !strings.Contains(field, ".") {
+			if val := ctx.Query(field); val != "" {
+				values = append(values, val)
+			}
+		}
+	}
+
+	// 2. 从 JSON Body 提取（支持嵌套）
+	if ctx.ContentType() == binding.MIMEJSON {
+		bodyStr, _ := requestBody(ctx)
+		if bodyStr != "" {
+			var paramsMap map[string]interface{}
+			if json.Unmarshal([]byte(bodyStr), &paramsMap) == nil {
+				for _, field := range fields {
+					if val, ok := getNestedValue(paramsMap, field); ok {
+						strVal, ok := val.(string)
+						if !ok {
+							continue
+						}
+						values = append(values, strVal)
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 去重
+	uniqueValues := make(map[string]bool)
+	var result []string
+	for _, val := range values {
+		if !uniqueValues[val] {
+			uniqueValues[val] = true
+			result = append(result, val)
+		}
+	}
+
+	return result
 }
 
 // getNestedValue 从 map[string]interface{} 中按 "a.b.c" 路径取值
