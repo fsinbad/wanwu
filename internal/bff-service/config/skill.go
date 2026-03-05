@@ -24,7 +24,7 @@ type SkillsConfig struct {
 }
 
 func (stf *SkillsConfig) AgentSkillZipToBytes(skillsId string) ([]byte, error) {
-	return util.DirToBytes(filepath.Join(akConfigDir, skillsId))
+	return util.ZipDir(filepath.Join(akConfigDir, skillsId))
 }
 
 // --- internal ---

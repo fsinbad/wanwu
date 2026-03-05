@@ -7,75 +7,94 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-func DirToBytes(dir string) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buf)
-	defer func() { _ = zipWriter.Close() }()
+// ZipDir 将目录打包为 zip 格式数据。
+// srcDir: 源目录路径，支持两种模式：
+//   - "/path/to/dir"：包含最后一级目录名，zip 内容为 "dir/file1.txt"
+//   - "/path/to/dir/."：不包含最后一级目录名，zip 内容为 "file1.txt"
+func ZipDir(srcDir string) ([]byte, error) {
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
 
-	// 检查路径是否存在
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("路径不存在: %s", dir)
+	skipBase := strings.HasSuffix(srcDir, string(os.PathSeparator)+".")
+	srcDir = filepath.Clean(srcDir)
+
+	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("directory not found: %s", srcDir)
 	}
 
-	// 获取顶层目录名（用于 ZIP 内的根目录）
-	dirName := filepath.Base(dir)
+	var baseName string
+	if skipBase {
+		baseName = ""
+	} else {
+		baseName = filepath.Base(srcDir)
+	}
 
-	err := filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
+	err := filepath.Walk(srcDir, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// 计算相对于源目录的路径
-		relPath, err := filepath.Rel(dir, filePath)
+		relPath, err := filepath.Rel(srcDir, filePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("get relative path failed: %w", err)
 		}
 
-		// 构建 ZIP 内的路径：dirName/relPath
-		zipPath := filepath.ToSlash(filepath.Join(dirName, relPath))
+		var zipPath string
+		if relPath == "." {
+			if skipBase {
+				return nil
+			}
+			zipPath = baseName + "/"
+		} else {
+			if skipBase {
+				zipPath = filepath.ToSlash(relPath)
+			} else {
+				zipPath = filepath.ToSlash(filepath.Join(baseName, relPath))
+			}
+		}
+
 		if info.IsDir() {
-			zipPath += "/" // 目录必须以 / 结尾
+			zipPath += "/"
 		}
 
 		header, err := zip.FileInfoHeader(info)
 		if err != nil {
-			return err
+			return fmt.Errorf("create zip header failed: %w", err)
 		}
 		header.Name = zipPath
-		// 指明使用store只存储不使用压缩算法
 		header.Method = zip.Store
 
-		// 创建 ZIP 条目
 		writer, err := zipWriter.CreateHeader(header)
 		if err != nil {
-			return err
+			return fmt.Errorf("create zip entry failed: %w", err)
 		}
 
-		// 如果是文件，写入内容
-		if !info.IsDir() {
-			file, err := os.Open(filePath)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(writer, file)
-			defer func() { _ = file.Close() }()
-			if err != nil {
-				return err
-			}
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("open file failed: %w", err)
+		}
+		_, err = io.Copy(writer, file)
+		_ = file.Close()
+		if err != nil {
+			return fmt.Errorf("write file content failed: %w", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walk directory failed: %w", err)
 	}
 
-	// 必须 Close 才会 flush 数据到 buf
 	if err := zipWriter.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("close zip writer failed: %w", err)
 	}
 
 	return buf.Bytes(), nil
