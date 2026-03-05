@@ -183,7 +183,7 @@ func GetSkillConversationDetail(ctx *gin.Context, userId, orgId string, req requ
 	for _, item := range respList {
 		for i := range item.ResponseFiles {
 			if skillSaveId, ok := item.ResponseFiles[i].MetaData["skillSaveId"].(string); ok {
-				item.ResponseFiles[i].MetaData["isSend"] = validSaveIds[skillSaveId]
+				item.ResponseFiles[i].MetaData["inResource"] = validSaveIds[skillSaveId]
 			}
 		}
 	}
@@ -206,7 +206,8 @@ func SkillConversationChat(ctx *gin.Context, userId, orgId string, req request.S
 	}
 
 	// 存储路径 /tmp/skills/<uuid>
-	outputDir := fmt.Sprintf("/tmp/skills/%v", util.GenUUID())
+	fileName := util.GenUUID()
+	outputDir := fmt.Sprintf("/tmp/skills/%v", fileName)
 
 	// 流式问答
 	streamCh, err := skillConversationChatTemp(ctx, userId, orgId, req)
@@ -216,7 +217,7 @@ func SkillConversationChat(ctx *gin.Context, userId, orgId string, req request.S
 
 	// 处理流式问答
 	_ = sse_util.NewSSEWriter(ctx, fmt.Sprintf("[Skill] conversation %v user %v org %v recv", req.ConversationId, userId, orgId), sse_util.DONE_MSG).
-		WriteStream(streamCh, nil, buildSkillChatRespLineProcessor(), buildSkillChatDoneProcessor(ctx, userId, orgId, req, outputDir))
+		WriteStream(streamCh, nil, buildSkillChatRespLineProcessor(), buildSkillChatDoneProcessor(ctx, userId, orgId, req, outputDir, fileName))
 	return nil
 }
 
@@ -266,53 +267,37 @@ func skillConversationChatTemp(ctx *gin.Context, userId, orgId string, req reque
 	return rawCh, nil
 }
 
-func buildSkillChatDoneProcessor(ctx *gin.Context, userId, orgId string, req request.SkillConversationChatReq, OutputDir string) func(sse_util.SSEWriterClient[string], interface{}) error {
+func buildSkillChatDoneProcessor(ctx *gin.Context, userId, orgId string, req request.SkillConversationChatReq, OutputDir, fileName string) func(sse_util.SSEWriterClient[string], interface{}) error {
 	return func(c sse_util.SSEWriterClient[string], params interface{}) error {
-		skillSaveId := ""
-
-		if OutputDir != "" {
-			if _, err := os.Stat(OutputDir); err == nil {
-				zipBytes, err := util.DirToBytes(OutputDir)
-				if err != nil {
-					log.Errorf("DirToBytes error: %v", err)
-				} else {
-					fileName := util.GenUUID() + ".zip"
-					_, _, err := minio.UploadFileCommonWithNotExpire(ctx.Request.Context(), bytes.NewReader(zipBytes), ".zip", int64(len(zipBytes)))
-					if err != nil {
-						log.Errorf("UploadFileCommonWithNotExpire error: %v", err)
-					} else {
-						minioUrl, err := minio.GetUploadFileCommon(ctx.Request.Context(), fileName, false)
-						if err != nil {
-							log.Errorf("GetUploadFileCommon error: %v", err)
-						} else {
-							log.Infof("Uploaded skill zip to minio: %s", minioUrl)
-							skillSaveId = "mock-skill-save-id-" + util.GenUUID()
-
-							_, err = mcp.CustomSkillCreate(ctx.Request.Context(), &mcp_service.CustomSkillCreateReq{
-								Name:       "skill-" + util.GenUUID(),
-								ObjectPath: minioUrl,
-								SourceType: "generated",
-								Identity: &mcp_service.Identity{
-									UserId: userId,
-									OrgId:  orgId,
-								},
-							})
-							if err != nil {
-								log.Errorf("CustomSkillCreate error: %v", err)
-							}
-						}
-					}
-				}
+		// 若文件夹为空，则先创建
+		if _, err := os.Stat(OutputDir); err != nil {
+			if err = os.MkdirAll(OutputDir, 0755); err != nil {
+				log.Errorf("MkdirAll error: %v", err)
+				return err
 			}
 		}
 
-		resp := response.SkillConversationChatResp{
-			Code:    0,
-			Message: "success",
-			Finish:  1,
+		// 压缩文件夹
+		zipBytes, err := util.ZipDir(OutputDir)
+		if err != nil {
+			return err
 		}
-		if skillSaveId != "" {
-			resp.SkillSaveId = skillSaveId
+
+		// 上传到 minio
+		fileName, _, err = minio.UploadFileCommonWithExpire(ctx.Request.Context(), bytes.NewReader(zipBytes), ".zip", int64(len(zipBytes)))
+		if err != nil {
+			return err
+		}
+
+		// 存储到数据库获得saveId
+
+		// save to es
+		assistant.
+			resp := response.SkillConversationChatResp{
+			Code:        0,
+			Message:     "success",
+			SkillSaveId: asdsad,
+			Finish:      1,
 		}
 
 		marshal, _ := json.Marshal(resp)
@@ -341,37 +326,6 @@ func buildSkillChatRespLineProcessor() func(sse_util.SSEWriterClient[string], st
 }
 
 func SkillConversationSave(ctx *gin.Context, userId, orgId string, req request.SkillConversationSaveReq) (*response.CustomSkillIDResp, error) {
-	//searchResp, err := assistant.SearchFromES(ctx.Request.Context(), &assistant_service.SearchFromESReq{
-	//	IndexName: "skill_creation_conversation_detail_*",
-	//	Conditions: map[string]string{
-	//		"conversationId": req.ConversationId,
-	//	},
-	//	PageNo:    1,
-	//	PageSize:  1000,
-	//	SortField: "createdAt",
-	//	SortOrder: "desc",
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//saveIds := make([]string, 0)
-	//for _, docJSON := range searchResp.DocJsonList {
-	//	var detail response.SkillConversationDetailInfo
-	//	if err := json.Unmarshal([]byte(docJSON), &detail); err != nil {
-	//		continue
-	//	}
-	//	for _, cardInfo := range detail.ResponseFiles {
-	//		if cardInfo.MetaData["skillSaveId"] != "" {
-	//			saveIds = append(saveIds, cardInfo.MetaData["skillSaveId"].(string))
-	//		}
-	//	}
-	//}
-	//
-	//if len(saveIds) == 0 {
-	//	return nil
-	//}
-
 	skillId, err := CreateCustomSkill(ctx, userId, orgId, request.CreateCustomSkillReq{
 		Author:     "wanwu",
 		ZipUrl:     "数据库获取",
