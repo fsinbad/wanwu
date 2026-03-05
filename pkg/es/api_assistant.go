@@ -37,18 +37,7 @@ func Assistant() *client {
 func InitESIndexTemplate(ctx context.Context) error {
 	templateName := "conversation_detail_infos_template"
 
-	// 检查模板是否已存在
-	exists, err := Assistant().IndexTemplateExists(ctx, templateName)
-	if err != nil {
-		return fmt.Errorf("检查ES索引模板失败: %v", err)
-	}
-
-	if exists {
-		log.Infof("ES索引模板已存在: %s", templateName)
-		return nil
-	}
-
-	// 创建索引模板
+	// 创建或更新索引模板（每次启动都更新，确保模板是最新的）
 	template := `{
 		"index_patterns": [
 			"conversation_detail_infos_*"
@@ -72,7 +61,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 						"type": "text",
 						"fields": {
 							"keyword": {
-								"type": "keyword"
+								"type": "keyword",
+								"ignore_above": 256
 							}
 						}
 					},
@@ -80,7 +70,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 						"type": "text",
 						"fields": {
 							"keyword": {
-								"type": "keyword"
+								"type": "keyword",
+								"ignore_above": 256
 							}
 						}
 					},
@@ -88,7 +79,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 						"type": "text",
 						"fields": {
 							"keyword": {
-								"type": "keyword"
+								"type": "keyword",
+								"ignore_above": 256
 							}
 						}
 					},
@@ -104,7 +96,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 						"type": "text",
 						"fields": {
 							"keyword": {
-								"type": "keyword"
+								"type": "keyword",
+								"ignore_above": 256
 							}
 						}
 					},
@@ -112,7 +105,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 						"type": "text",
 						"fields": {
 							"keyword": {
-								"type": "keyword"
+								"type": "keyword",
+								"ignore_above": 256
 							}
 						}
 					},
@@ -135,7 +129,8 @@ func InitESIndexTemplate(ctx context.Context) error {
 								"type": "text",
 								"fields": {
 									"keyword": {
-										"type": "keyword"
+										"type": "keyword",
+										"ignore_above": 256
 									}
 								}
 							},

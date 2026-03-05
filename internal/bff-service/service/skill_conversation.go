@@ -25,8 +25,14 @@ import (
 )
 
 const (
-	skillConversationESIndexName = "skill_creation_conversation_detail_*"
+	skillConversationESIndexName = "conversation_detail_infos_skill_*"
 )
+
+func getSkillConversationESIndexName() string {
+	now := time.Now()
+	indexName := fmt.Sprintf("conversation_detail_infos_skill_%d%02d%02d", now.Year(), now.Month(), now.Day())
+	return indexName
+}
 
 func CreateSkillConversation(ctx *gin.Context, userId, orgId string, req request.CreateSkillConversationReq) (*response.CreateSkillConversationResp, error) {
 	rpcResp, err := assistant.CreateSkillConversation(ctx.Request.Context(), &assistant_service.CreateSkillConversationReq{
@@ -144,6 +150,10 @@ func GetSkillConversationDetail(ctx *gin.Context, userId, orgId string, req requ
 }
 
 func SkillConversationChat(ctx *gin.Context, userId, orgId string, req request.SkillConversationChatReq) error {
+
+	if req.ModelConfig == nil || req.ModelConfig.ModelId == "" {
+		return fmt.Errorf("modelConfig or modelId is empty")
+	}
 
 	// 查询模型信息
 	modelInfo, err := model.GetModel(ctx.Request.Context(), &model_service.GetModelReq{
@@ -286,7 +296,7 @@ func buildSkillChatDoneProcessor(ctx *gin.Context, userId, orgId string, req req
 				ResponseFiles: lastSSE.ResponseFiles,
 			})
 			if _, err := assistant.SaveToES(ctx.Request.Context(), &assistant_service.SaveToESReq{
-				IndexName: skillConversationESIndexName,
+				IndexName: getSkillConversationESIndexName(),
 				DocJson:   string(b),
 			}); err != nil {
 				log.Errorf("[Skill] conversation %v user %v org %v save to es err: %v", req.ConversationId, userId, orgId, err)
@@ -332,9 +342,9 @@ func buildSkillChatDoneProcessor(ctx *gin.Context, userId, orgId string, req req
 			},
 		})
 		// 删除临时文件
-		if err := util.DeleteDir(outputDir); err != nil {
-			return err
-		}
+		// if err := util.DeleteDir(outputDir); err != nil {
+		// 	return err
+		// }
 		return nil
 	}
 }
