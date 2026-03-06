@@ -74,7 +74,7 @@ func buildSkillCreatorOptions(modelConfig wga_sandbox_option.ModelConfig, inputD
 }
 
 func filterOpencodeEvents(jsonCh <-chan string) <-chan string {
-	resultCh := make(chan string, 10)
+	resultCh := make(chan string, 1024)
 
 	go func() {
 		defer util.PrintPanicStack()

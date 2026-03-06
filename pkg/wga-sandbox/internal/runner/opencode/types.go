@@ -98,10 +98,17 @@ type sseEventPayload struct {
 // sseEventProps SSE 事件属性。
 type sseEventProps struct {
 	SessionID string         `json:"sessionID"`
-	Part      sseEventPart   `json:"part"`
 	Delta     string         `json:"delta"`
+	Part      sseEventPart   `json:"part"`
 	Status    sseEventStatus `json:"status"`
 	Error     sseEventError  `json:"error"`
+	Info      sseEventInfo   `json:"info"`
+}
+
+// sseEventInfo SSE 消息信息（message.updated 事件）。
+type sseEventInfo struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
 }
 
 // sseEventError SSE 错误事件属性。

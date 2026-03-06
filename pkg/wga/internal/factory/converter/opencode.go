@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/UnicomAI/wanwu/pkg/log"
-	"github.com/UnicomAI/wanwu/pkg/wga-sandbox"
+	wga_sandbox "github.com/UnicomAI/wanwu/pkg/wga-sandbox"
 	"github.com/cloudwego/eino/schema"
 )
 

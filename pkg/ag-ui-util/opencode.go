@@ -3,6 +3,7 @@ package ag_ui_util
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/UnicomAI/wanwu/pkg/log"
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -105,6 +106,7 @@ func (t *OpencodeTranslator) translateText(partData json.RawMessage) []aguievent
 
 	var events []aguievents.Event
 	events = append(events, t.EnsureRunStarted()...)
+	events = append(events, t.EndReasoning()...)
 	events = append(events, t.StartTextMessage()...)
 	events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, part.Text))
 	return events
@@ -124,9 +126,10 @@ func (t *OpencodeTranslator) translateReasoning(partData json.RawMessage) []agui
 	var events []aguievents.Event
 	events = append(events, t.EnsureRunStarted()...)
 	events = append(events, t.StartTextMessage()...)
+	events = append(events, t.StartReasoning()...)
 
-	reasoningContent := formatReasoningContent(part.Text)
-	events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, reasoningContent))
+	content := strings.ReplaceAll(part.Text, "\n", "\n> ")
+	events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, content))
 	return events
 }
 
@@ -144,6 +147,7 @@ func (t *OpencodeTranslator) translateError(partData json.RawMessage) []aguieven
 
 	var events []aguievents.Event
 	events = append(events, t.EnsureRunStarted()...)
+	events = append(events, t.EndReasoning()...)
 	events = append(events, t.StartTextMessage()...)
 	events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, msg))
 	return events
@@ -158,6 +162,7 @@ func (t *OpencodeTranslator) translateToolUse(partData json.RawMessage) []aguiev
 
 	var events []aguievents.Event
 	events = append(events, t.EnsureRunStarted()...)
+	events = append(events, t.EndReasoning()...)
 	events = append(events, t.StartTextMessage()...)
 
 	toolCallID := part.CallID

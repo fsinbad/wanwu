@@ -2,6 +2,7 @@ package ag_ui_util
 
 import (
 	"context"
+	"strings"
 
 	"github.com/UnicomAI/wanwu/pkg/util"
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -59,12 +60,16 @@ func (t *EinoTranslator) Translate(_ context.Context, event *adk.AgentEvent) []a
 	events = append(events, t.EnsureRunStarted()...)
 	events = append(events, t.StartTextMessage()...)
 
+	// 处理 reasoning
 	if msg.ReasoningContent != "" {
-		content := formatReasoningContent(msg.ReasoningContent)
+		events = append(events, t.StartReasoning()...)
+		content := strings.ReplaceAll(msg.ReasoningContent, "\n", "\n> ")
 		events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, content))
 	}
 
+	// 处理普通内容，结束 reasoning 状态
 	if msg.Content != "" {
+		events = append(events, t.EndReasoning()...)
 		events = append(events, aguievents.NewTextMessageContentEvent(t.messageID, msg.Content))
 	}
 

@@ -27,7 +27,7 @@ type WgaSandboxTool struct {
 }
 
 type WgaSandboxSkill struct {
-	// TODO: 待定义
+	Dir string `json:"dir" validate:"required"`
 }
 
 func (r *WgaSandboxRunReq) Check() error {

@@ -25,6 +25,7 @@ type BaseState struct {
 	runStarted  bool
 	runFinished bool
 	textStarted bool
+	inReasoning bool
 }
 
 // NewBaseState 创建基础状态。
@@ -66,6 +67,24 @@ func (s *BaseState) EndTextMessage() []aguievents.Event {
 	return []aguievents.Event{aguievents.NewTextMessageEndEvent(s.messageID)}
 }
 
+// StartReasoning 开始 reasoning，返回 reasoningStart 事件（仅第一次）。
+func (s *BaseState) StartReasoning() []aguievents.Event {
+	if s.inReasoning {
+		return nil
+	}
+	s.inReasoning = true
+	return []aguievents.Event{aguievents.NewTextMessageContentEvent(s.messageID, reasoningStart)}
+}
+
+// EndReasoning 结束 reasoning，返回 reasoningEnd 事件。
+func (s *BaseState) EndReasoning() []aguievents.Event {
+	if !s.inReasoning {
+		return nil
+	}
+	s.inReasoning = false
+	return []aguievents.Event{aguievents.NewTextMessageContentEvent(s.messageID, reasoningEnd)}
+}
+
 // FinishBase 生成基础结束事件。
 func (s *BaseState) FinishBase() []aguievents.Event {
 	if s.runFinished {
@@ -74,6 +93,7 @@ func (s *BaseState) FinishBase() []aguievents.Event {
 	s.runFinished = true
 	var events []aguievents.Event
 	events = append(events, s.EnsureRunStarted()...)
+	events = append(events, s.EndReasoning()...)
 	events = append(events, s.EndTextMessage()...)
 	events = append(events, aguievents.NewRunFinishedEvent(s.threadID, s.runID))
 	return events
@@ -132,12 +152,6 @@ const (
 	reasoningStart = "\n> 💭 \n> "
 	reasoningEnd   = "\n\n"
 )
-
-// formatReasoningContent 格式化推理内容为 Markdown 引用格式。
-func formatReasoningContent(text string) string {
-	replaced := strings.ReplaceAll(text, "\n", "\n> ")
-	return reasoningStart + replaced + reasoningEnd
-}
 
 // RemoveReasoningContent 移除文本中的推理内容。
 func RemoveReasoningContent(content string) string {

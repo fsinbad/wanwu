@@ -10,15 +10,18 @@ api.go
   └── Cleanup(ctx, runID)    清理沙箱
 
 api_opencode.go
-  ├── ParseOpencodeEvent(data)           → *OpencodeEvent
-  ├── ParseOpencodeTextPart(data)        → *TextPart
-  ├── ParseOpencodeToolPart(data)        → *ToolPart
-  ├── ParseOpencodeReasoningPart(data)   → *ReasoningPart
-  ├── ParseOpencodeFilePart(data)        → *FilePart
-  ├── ParseOpencodeSnapshotPart(data)    → *SnapshotPart
-  ├── ParseOpencodeAgentPart(data)       → *AgentPart
-  ├── ParseOpencodePartPatchPart(data)   → *PartPatchPart
-  └── ParseOpencodePartRetryPart(data)   → *PartRetryPart
+  ├── ParseOpencodeEvent(data)            → *OpencodeEvent
+  ├── ParseOpencodeTextPart(data)         → *TextPart
+  ├── ParseOpencodeToolPart(data)         → *ToolPart
+  ├── ParseOpencodeReasoningPart(data)    → *ReasoningPart
+  ├── ParseOpencodeStepStartPart(data)    → *StepStartPart
+  ├── ParseOpencodeStepFinishPart(data)   → *StepFinishPart
+  ├── ParseOpencodeFilePart(data)         → *FilePart
+  ├── ParseOpencodeSnapshotPart(data)     → *SnapshotPart
+  ├── ParseOpencodeAgentPart(data)        → *AgentPart
+  ├── ParseOpencodePartPatchPart(data)    → *PartPatchPart
+  ├── ParseOpencodePartRetryPart(data)    → *PartRetryPart
+  └── ParseOpencodeErrorPart(data)        → *ErrorPart
 
 sandbox.Manager
   ├── Create(ctx, runID, cfg)  创建沙箱
@@ -136,6 +139,7 @@ eventCh := tr.TranslateStream(ctx, outputCh)
 | `WithEnableThinking` | 思考模式 | 否 |
 | `WithSkipCleanup` | 跳过清理 | 否 |
 | `WithAgentName` | 智能体名称 | 否 |
+| `WithRunnerType` | 运行器类型（默认 opencode） | 否 |
 
 ## 依赖
 
@@ -156,3 +160,6 @@ eventCh := tr.TranslateStream(ctx, outputCh)
 | `OpencodeEventTypeAgent` | 智能体 |
 | `OpencodeEventTypePatch` | 补丁 |
 | `OpencodeEventTypeRetry` | 重试 |
+| `OpencodeEventTypeSubtask` | 子任务 |
+| `OpencodeEventTypeCompaction` | 压缩 |
+| `OpencodeEventTypeError` | 错误 |

@@ -72,6 +72,16 @@ func WgaSandboxRun(ctx *gin.Context, req *request.WgaSandboxRunReq) error {
 		opts = append(opts, wga_sandbox_option.WithMessages(messages))
 	}
 
+	if len(req.Skills) > 0 {
+		skills := make([]wga_sandbox_option.Skill, len(req.Skills))
+		for i, skill := range req.Skills {
+			skills[i] = wga_sandbox_option.Skill{
+				Dir: skill.Dir,
+			}
+		}
+		opts = append(opts, wga_sandbox_option.WithSkills(skills))
+	}
+
 	_, outputCh, err := wga_sandbox.Run(ctx.Request.Context(), opts...)
 	if err != nil {
 		return grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("wga sandbox run failed: %v", err))

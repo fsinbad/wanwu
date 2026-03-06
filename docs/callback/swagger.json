@@ -3917,7 +3917,15 @@
             }
         },
         "request.WgaSandboxSkill": {
-            "type": "object"
+            "type": "object",
+            "required": [
+                "dir"
+            ],
+            "properties": {
+                "dir": {
+                    "type": "string"
+                }
+            }
         },
         "request.WgaSandboxTool": {
             "type": "object"

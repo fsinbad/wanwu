@@ -442,15 +442,15 @@ func (r *Runner) processSSEEvents(ctx context.Context, sseCh <-chan string, outp
 			if !ok {
 				return
 			}
-			r.trackUserMessageID(data)
-			if line := r.convertEvent(data); line != "" {
+			line, isIdle := r.handleEvent(data)
+			if line != "" {
 				select {
 				case outputCh <- line:
 				case <-ctx.Done():
 					return
 				}
 			}
-			if r.isSessionIdle(data) {
+			if isIdle {
 				return
 			}
 		}
@@ -508,57 +508,58 @@ func (r *Runner) buildSystemAndPrompt() (system string, prompt string, err error
 // 事件转换
 // ============================================================================
 
-// trackUserMessageID 记录用户消息 ID，用于过滤用户消息的事件。
-func (r *Runner) trackUserMessageID(data string) {
-	var event struct {
-		Payload struct {
-			Type       string `json:"type"`
-			Properties struct {
-				Info struct {
-					ID   string `json:"id"`
-					Role string `json:"role"`
-				} `json:"info"`
-			} `json:"properties"`
-		} `json:"payload"`
-	}
+// handleEvent 处理 SSE 事件，返回 (输出内容, 是否会话结束)。
+func (r *Runner) handleEvent(data string) (string, bool) {
+	var event sseEvent
 	if err := json.Unmarshal([]byte(data), &event); err != nil {
-		return
+		return "", false
 	}
-	if event.Payload.Type == "message.updated" && event.Payload.Properties.Info.Role == "user" {
-		r.userMsgIDs[event.Payload.Properties.Info.ID] = true
+
+	// 过滤其他沙箱的事件
+	if event.Directory != r.sb.WorkDir() {
+		return "", false
+	}
+
+	switch event.Payload.Type {
+	case "message.updated":
+		// 记录用户消息 ID，不需要检查 sessionID
+		r.trackUserMessageIDFromEvent(&event)
+		return "", false
+	case "session.idle":
+		// session.idle: SessionID 在 Properties 中
+		if event.Payload.Properties.SessionID != r.sessionID {
+			return "", false
+		}
+		return "", true
+	case "session.error":
+		// session.error: SessionID 在 Properties 中
+		if event.Payload.Properties.SessionID != r.sessionID {
+			return "", false
+		}
+		return r.convertErrorEvent(&event), false
+	case "message.part.updated":
+		// message.part.updated: SessionID 在 Part 中
+		if event.Payload.Properties.Part.SessionID != r.sessionID {
+			return "", false
+		}
+		return r.convertMessagePartEvent(&event), false
+	default:
+		return "", false
 	}
 }
 
-// convertEvent 转换 SSE 事件为 JSON 格式输出。
-// 过滤条件：
-//   - 目录和 sessionID 匹配
-//   - 处理 session.error 和 message.part.updated 类型
-//   - 过滤用户消息的事件
-func (r *Runner) convertEvent(data string) string {
-	var event sseEvent
-	if err := json.Unmarshal([]byte(data), &event); err != nil {
-		return ""
+// trackUserMessageIDFromEvent 从 message.updated 事件中记录用户消息 ID。
+func (r *Runner) trackUserMessageIDFromEvent(event *sseEvent) {
+	info := event.Payload.Properties.Info
+	if info.Role == "user" && info.ID != "" {
+		r.userMsgIDs[info.ID] = true
 	}
+}
 
-	if event.Directory != r.sb.WorkDir() {
-		return ""
-	}
-
-	// 优先处理 session.error
-	if event.Payload.Type == "session.error" {
-		return r.convertErrorEvent(&event)
-	}
-
-	if event.Payload.Type != "message.part.updated" {
-		return ""
-	}
-
+// convertMessagePartEvent 转换 message.part.updated 事件。
+func (r *Runner) convertMessagePartEvent(event *sseEvent) string {
 	props := event.Payload.Properties
 	part := props.Part
-
-	if part.SessionID != r.sessionID {
-		return ""
-	}
 
 	if r.userMsgIDs[part.MessageID] {
 		return ""
@@ -577,12 +578,9 @@ func (r *Runner) convertEvent(data string) string {
 }
 
 // convertTextEvent 转换文本事件。
-// delta 非空表示增量事件，忽略；delta 为空表示最终事件，发送完整文本。
+// delta 非空时输出增量文本（流式），delta 为空时跳过（最终事件，已通过增量输出）。
 func (r *Runner) convertTextEvent(part *sseEventPart, delta string) string {
-	if delta != "" {
-		return ""
-	}
-	if part.Text == "" {
+	if delta == "" {
 		return ""
 	}
 
@@ -591,7 +589,7 @@ func (r *Runner) convertTextEvent(part *sseEventPart, delta string) string {
 		Timestamp: time.Now().UnixMilli(),
 		SessionID: r.sessionID,
 	}
-	textP := textPart{Type: "text", Text: part.Text}
+	textP := textPart{Type: "text", Text: delta}
 	event.Part, _ = json.Marshal(textP)
 
 	data, _ := json.Marshal(event)
@@ -599,16 +597,13 @@ func (r *Runner) convertTextEvent(part *sseEventPart, delta string) string {
 }
 
 // convertReasoningEvent 转换推理事件。
-// delta 非空表示增量事件，忽略；delta 为空表示最终事件。
+// delta 非空时输出增量文本（流式），delta 为空时跳过（最终事件，已通过增量输出）。
 // 未开启 EnableThinking 时不输出 reasoning。
 func (r *Runner) convertReasoningEvent(part *sseEventPart, delta string) string {
-	if delta != "" {
-		return ""
-	}
-	if part.Text == "" {
-		return ""
-	}
 	if !r.req.EnableThinking {
+		return ""
+	}
+	if delta == "" {
 		return ""
 	}
 
@@ -617,7 +612,7 @@ func (r *Runner) convertReasoningEvent(part *sseEventPart, delta string) string 
 		Timestamp: time.Now().UnixMilli(),
 		SessionID: r.sessionID,
 	}
-	reasoningP := reasoningPart{Type: "reasoning", Text: part.Text}
+	reasoningP := reasoningPart{Type: "reasoning", Text: delta}
 	event.Part, _ = json.Marshal(reasoningP)
 
 	data, _ := json.Marshal(event)
@@ -674,15 +669,6 @@ func (r *Runner) convertErrorEvent(event *sseEvent) string {
 
 	data, _ := json.Marshal(evt)
 	return string(data)
-}
-
-// isSessionIdle 检查是否为 session.idle 事件，表示会话结束。
-func (r *Runner) isSessionIdle(data string) bool {
-	var event sseEvent
-	if err := json.Unmarshal([]byte(data), &event); err != nil {
-		return false
-	}
-	return event.Payload.Type == "session.idle"
 }
 
 // ============================================================================

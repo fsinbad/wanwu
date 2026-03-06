@@ -1880,6 +1880,11 @@ definitions:
     - model
     type: object
   request.WgaSandboxSkill:
+    properties:
+      dir:
+        type: string
+    required:
+    - dir
     type: object
   request.WgaSandboxTool:
     type: object
