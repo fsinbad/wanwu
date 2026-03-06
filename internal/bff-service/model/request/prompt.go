@@ -61,3 +61,18 @@ type PromptOptimizeReq struct {
 }
 
 func (req *PromptOptimizeReq) Check() error { return nil }
+
+type PromptReasonReq struct {
+	Prompt  string `json:"prompt" validate:"required"`
+	ModelId string `json:"modelId" validate:"required"`
+}
+
+func (req *PromptReasonReq) Check() error { return nil }
+
+type PromptEvaluateReq struct {
+	Answer         string `json:"answer" validate:"required"`
+	ExpectedOutput string `json:"expectedOutput" validate:"required"`
+	ModelId        string `json:"modelId" validate:"required"`
+}
+
+func (req *PromptEvaluateReq) Check() error { return nil }

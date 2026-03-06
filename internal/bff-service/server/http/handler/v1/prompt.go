@@ -147,3 +147,39 @@ func GetPromptOptimize(ctx *gin.Context) {
 	}
 	service.GetPromptOptimize(ctx, getUserID(ctx), getOrgID(ctx), req)
 }
+
+// GetPromptReason
+//
+//	@Tags			prompt
+//	@Summary		获取提示词推理结果
+//	@Description	获取提示词推理结果
+//	@Accept			json
+//	@Produce		json
+//	@Param			data	body		request.PromptReasonReq	true	"提示词推理请求参数"
+//	@Success		200		{object}	response.Response
+//	@Router			/prompt/reason [post]
+func GetPromptReason(ctx *gin.Context) {
+	var req request.PromptReasonReq
+	if !gin_util.Bind(ctx, &req) {
+		return
+	}
+	service.GetPromptReason(ctx, getUserID(ctx), getOrgID(ctx), req)
+}
+
+// GetPromptEvaluate
+//
+//	@Tags			prompt
+//	@Summary		获取提示词评估结果
+//	@Description	获取提示词评估结果
+//	@Accept			json
+//	@Produce		json
+//	@Param			data	body		request.PromptEvaluateReq	true	"提示词评估请求参数"
+//	@Success		200		{object}	response.Response
+//	@Router			/prompt/evaluate [post]
+func GetPromptEvaluate(ctx *gin.Context) {
+	var req request.PromptEvaluateReq
+	if !gin_util.Bind(ctx, &req) {
+		return
+	}
+	service.GetPromptEvaluate(ctx, getUserID(ctx), getOrgID(ctx), req)
+}

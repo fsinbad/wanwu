@@ -60,5 +60,7 @@ func registerTool(apiV1 *gin.RouterGroup) {
 	mid.Sub("resource.prompt").Reg(apiV1, "/prompt/custom/copy", http.MethodPost, v1.CopyCustomPrompt, "复制自定义Prompt")
 	mid.Sub("resource.prompt").Reg(apiV1, "/prompt/template", http.MethodPost, v1.CreatePromptByTemplate, "复制提示词模板")
 	mid.Sub("resource.prompt").Reg(apiV1, "/prompt/optimize", http.MethodPost, v1.GetPromptOptimize, "提示词优化", middleware.AuthModelByModelId([]string{"modelId"}))
+	mid.Sub("resource.prompt").Reg(apiV1, "/prompt/reason", http.MethodPost, v1.GetPromptReason, "提示词推理", middleware.AuthModelByModelId([]string{"modelId"}))
+	mid.Sub("resource.prompt").Reg(apiV1, "/prompt/evaluate", http.MethodPost, v1.GetPromptEvaluate, "提示词评估", middleware.AuthModelByModelId([]string{"modelId"}))
 
 }

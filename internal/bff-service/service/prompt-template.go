@@ -70,17 +70,9 @@ func GetPromptTemplateDetail(ctx *gin.Context, templateId string) (*response.Pro
 }
 
 func GetPromptOptimize(ctx *gin.Context, userID, orgID string, req request.PromptOptimizeReq) {
-	// 获取模型信息
-	modelInfo, err := model.GetModel(ctx.Request.Context(), &model_service.GetModelReq{ModelId: req.ModelId})
-	if err != nil {
-		gin_util.Response(ctx, nil, err)
-		return
-	}
-
 	// 构建请求信息
 	var stream = true
 	reqInfo := &mp_common.LLMReq{
-		Model: modelInfo.Model,
 		Messages: []mp_common.OpenAIReqMsg{
 			{
 				Role:    mp_common.MsgRoleSystem,
@@ -93,6 +85,56 @@ func GetPromptOptimize(ctx *gin.Context, userID, orgID string, req request.Promp
 		},
 		Stream: &stream,
 	}
+	getPromptCustom(ctx, req.ModelId, reqInfo)
+}
+
+func GetPromptReason(ctx *gin.Context, userID, orgID string, req request.PromptReasonReq) {
+	// 构建提示词推理请求信息
+	var stream = true
+	reqInfo := &mp_common.LLMReq{
+		Messages: []mp_common.OpenAIReqMsg{
+			{
+				Role:    mp_common.MsgRoleUser,
+				Content: req.Prompt,
+			},
+		},
+		Stream: &stream,
+	}
+	getPromptCustom(ctx, req.ModelId, reqInfo)
+}
+
+func GetPromptEvaluate(ctx *gin.Context, userID, orgID string, req request.PromptEvaluateReq) {
+	// 构建提示词推理请求信息
+	var stream = true
+	content := strings.ReplaceAll(config.Cfg().PromptEngineering.Evaluation, "{{target}}", req.ExpectedOutput)
+	content = strings.ReplaceAll(content, "{{answer}}", req.Answer)
+
+	// 构建提示词评估请求信息
+	evaReqInfo := &mp_common.LLMReq{
+		Messages: []mp_common.OpenAIReqMsg{
+			{
+				Role:    mp_common.MsgRoleSystem,
+				Content: content,
+			},
+			{
+				Role:    mp_common.MsgRoleUser,
+				Content: "目标回答： " + req.ExpectedOutput + "\n 待评估回答：" + req.Answer,
+			},
+		},
+		Stream: &stream,
+	}
+	getPromptCustom(ctx, req.ModelId, evaReqInfo)
+}
+
+// --- internal ---
+func getPromptCustom(ctx *gin.Context, modelId string, reqInfo *mp_common.LLMReq) {
+	// 获取模型信息
+	modelInfo, err := model.GetModel(ctx.Request.Context(), &model_service.GetModelReq{ModelId: modelId})
+	if err != nil {
+		gin_util.Response(ctx, nil, err)
+		return
+	}
+	reqInfo.Model = modelInfo.Model
 
 	// 配置模型参数
 	llm, err := mp.ToModelConfig(modelInfo.Provider, modelInfo.ModelType, modelInfo.ProviderConfig)
@@ -229,7 +271,6 @@ func GetPromptOptimize(ctx *gin.Context, userID, orgID string, req request.Promp
 	ctx.Set(gin_util.RESULT, answer)
 }
 
-// --- internal ---
 func buildPromptTempDetail(wtfCfg config.PromptTempConfig) *response.PromptTemplateDetail {
 	iconUrl := config.Cfg().DefaultIcon.PromptIcon
 	return &response.PromptTemplateDetail{

@@ -167,6 +167,7 @@ type PromptTempConfig struct {
 
 type PromptEngineeringConfig struct {
 	Optimization string `json:"optimization" mapstructure:"optimization"`
+	Evaluation   string `json:"evaluation" mapstructure:"evaluation"`
 }
 
 type WorkflowServiceConfig struct {
