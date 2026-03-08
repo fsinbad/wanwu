@@ -22,6 +22,9 @@ type Sandbox interface {
 	// CopyFromSandbox 将沙箱的 workDir 复制到本地。
 	// localPath: 本地目标路径
 	CopyFromSandbox(ctx context.Context, localPath string) error
+	// WriteFile 将数据写入沙箱文件。
+	// relativePath: 相对于 workDir 的目标路径
+	WriteFile(ctx context.Context, relativePath string, data []byte) error
 	// WorkDir 返回沙箱工作目录的绝对路径。
 	WorkDir() string
 	// UUID 返回沙箱唯一标识。

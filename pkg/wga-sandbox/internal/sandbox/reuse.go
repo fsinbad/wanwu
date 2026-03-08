@@ -120,6 +120,12 @@ func (s *reuseSandbox) CopyFromSandbox(ctx context.Context, localPath string) er
 	return s.copyFileFromSandbox(ctx, s.workDir, localPath)
 }
 
+// WriteFile 将数据写入沙箱文件。
+func (s *reuseSandbox) WriteFile(ctx context.Context, relativePath string, data []byte) error {
+	dstPath := filepath.Join(s.workDir, relativePath)
+	return s.client.uploadData(ctx, data, dstPath)
+}
+
 func (s *reuseSandbox) WorkDir() string {
 	return s.workDir
 }

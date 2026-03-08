@@ -200,7 +200,7 @@ func (r *Runner) setupConfig(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to render config: %w", err)
 	}
-	if err := writeFileViaBase64(ctx, r.sb, ".opencode/opencode.json", content); err != nil {
+	if err := r.sb.WriteFile(ctx, ".opencode/opencode.json", []byte(content)); err != nil {
 		return fmt.Errorf("failed to create opencode.json: %w", err)
 	}
 
@@ -260,7 +260,7 @@ func (r *Runner) setupTool(ctx context.Context, tool wga_sandbox_option.Tool) er
 
 	dstFileName := fmt.Sprintf("%s.%s.json", toSkillName(tool.Name), uuid.New().String()[:8])
 	dstPath := ".opencode/tools/" + dstFileName
-	if err := writeFileViaBase64(ctx, r.sb, dstPath, string(schemaData)); err != nil {
+	if err := r.sb.WriteFile(ctx, dstPath, schemaData); err != nil {
 		return fmt.Errorf("failed to write tool schema %s: %w", tool.Name, err)
 	}
 
@@ -737,12 +737,4 @@ func formatAuthContent(auth *openapi3_util.Auth) string {
 		authDesc = fmt.Sprintf("Auth Value: `%s`", auth.Value)
 	}
 	return fmt.Sprintf("\n## API Key\n\n%s\n", authDesc)
-}
-
-// writeFileViaBase64 通过 base64 编码写入文件，避免特殊字符问题。
-func writeFileViaBase64(ctx context.Context, sb sandbox.Sandbox, dstPath, content string) error {
-	encoded := base64.StdEncoding.EncodeToString([]byte(content))
-	cmd := fmt.Sprintf("echo '%s' | base64 -d > %s", encoded, dstPath)
-	_, err := sb.ExecuteSync(ctx, cmd)
-	return err
 }

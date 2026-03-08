@@ -65,6 +65,10 @@ func (s *oneshotSandbox) CopyFromSandbox(ctx context.Context, localPath string) 
 	panic("not implemented: oneshotSandbox.CopyFromSandbox")
 }
 
+func (s *oneshotSandbox) WriteFile(ctx context.Context, relativePath string, data []byte) error {
+	panic("not implemented: oneshotSandbox.WriteFile")
+}
+
 func (s *oneshotSandbox) WorkDir() string {
 	panic("not implemented: oneshotSandbox.WorkDir")
 }
